@@ -5,6 +5,7 @@ import subprocess
 import platform
 import shutil
 import requests
+import webbrowser
 from git import Repo, GitCommandError
 
 class ModpackManagerApp:
@@ -134,9 +135,9 @@ class ModpackManagerApp:
 
     def fetch_commit_messages(self):
         repos = {
-            "Dimserenes-Modpack": ("Dimserene", "Dimserenes-Modpack"),
-            "Fine-tuned-Pack": ("Dimserene", "Fine-tuned-Pack"),
-            "Vanilla-Plus-Pack": ("Dimserene", "Vanilla-Plus-Pack")
+            "Full(Extreme)": ("Dimserene", "Dimserenes-Modpack"),
+            "Fine-tuned": ("Dimserene", "Fine-tuned-Pack"),
+            "Vanilla+": ("Dimserene", "Vanilla-Plus-Pack")
         }
         commit_messages = {}
         for repo_name, (owner, name) in repos.items():
@@ -292,8 +293,18 @@ class ModpackManagerApp:
 
 
     def open_install_directory(self):
+        install_path = self.get_install_path()
+        
+        # Check if the directory exists, and create it if it does not
+        if not os.path.exists(install_path):
+            try:
+                os.makedirs(install_path)
+            except Exception as e:
+                messagebox.showerror("Error", f"An error occurred while creating the directory: {str(e)}")
+                return
+        
+        # Open the directory
         try:
-            install_path = self.get_install_path()
             if platform.system() == "Windows":
                 os.startfile(install_path)
             elif platform.system() == "Darwin":
@@ -302,6 +313,7 @@ class ModpackManagerApp:
                 subprocess.run(["xdg-open", install_path])
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred while opening the install directory: {str(e)}")
+
 
 
     def update_installed_info(self):
@@ -396,6 +408,9 @@ class ModpackManagerApp:
         except Exception as e:
             messagebox.showerror("Error", f"An error occurred while checking versions: {str(e)}")
 
+def open_discord():
+    webbrowser.open("https://discord.com/channels/1116389027176787968/1255696773599592458")
+
 def center_window(window, width, height):
     # Get the screen width and height
     screen_width = window.winfo_screenwidth()
@@ -415,4 +430,7 @@ if __name__ == "__main__":
     window_width = 400
     window_height = 550
     center_window(root, window_width, window_height)
+    discord_link = tk.Label(root, text="discord", fg="blue", cursor="hand2")
+    discord_link.pack()
+    discord_link.bind("<Button-1>", lambda e: open_discord())
     root.mainloop()
