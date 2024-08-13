@@ -71,11 +71,11 @@ class ModpackManagerApp:
     def create_widgets(self):
         # Title label
         self.title_label = tk.Label(self.root, text="Dimserene's Modpack Manager", font=('Helvetica', 16))
-        self.title_label.pack(pady=10)
+        self.title_label.pack(pady=10, padx=30)
 
         # PLAY button
-        self.play_button = tk.Button(self.root, text="PLAY", command=self.play_game, font=('Helvetica', 22), height=2, width=20)
-        self.play_button.pack(pady=10)
+        self.play_button = tk.Button(self.root, text="PLAY", command=self.play_game, font=('Helvetica', 22), height=2, width=10)
+        self.play_button.pack(pady=5)
 
         # Installed modpack info
         self.installed_info_label = tk.Label(self.root, text="", font=('Helvetica', 12))
@@ -500,15 +500,31 @@ def center_window(window, width, height):
 
     # Set the geometry of the window
     window.geometry(f'{width}x{height}+{int(x)}+{int(y)}')
-
+    
 if __name__ == "__main__":
     root = tk.Tk()
     app = ModpackManagerApp(root)
-    # Set the size of the window and center it
-    window_width = 400
-    window_height = 550
-    center_window(root, window_width, window_height)
+
     discord_link = tk.Label(root, text="discord", fg="blue", cursor="hand2")
     discord_link.pack()
     discord_link.bind("<Button-1>", lambda e: open_discord())
+
+    # Update the window size to ensure widgets are packed before centering
+    root.update_idletasks()
+
+    # Get the screen width and height
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+
+    # Get the window width and height
+    window_width = root.winfo_width()
+    window_height = root.winfo_height()
+
+    # Calculate the position x, y coordinates
+    position_x = (screen_width // 2) - (window_width // 2)
+    position_y = (screen_height // 2) - (window_height // 2)
+
+    # Set the position of the window to the calculated coordinates
+    root.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+
     root.mainloop()
