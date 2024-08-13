@@ -119,11 +119,8 @@ class ModpackManagerApp:
     def get_latest_commit_message(self, repo_owner, repo_name):
         try:
             url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/commits"
-            headers = {
-                "Authorization": "token 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"
-            }
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
+            response = requests.get(url)
+            response.raise_for_status()  # Raise an exception for HTTP errors
             commits = response.json()
             if commits:
                 latest_commit = commits[0]
@@ -416,6 +413,6 @@ if __name__ == "__main__":
     app = ModpackManagerApp(root)
     # Set the size of the window and center it
     window_width = 400
-    window_height = 400
+    window_height = 550
     center_window(root, window_width, window_height)
     root.mainloop()
