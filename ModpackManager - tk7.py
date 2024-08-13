@@ -7,8 +7,10 @@ import platform
 import shutil
 import requests
 import webbrowser
-from git import Repo, GitCommandError
 import zipfile
+os.environ["GIT_PYTHON_REFRESH"] = "quiet"
+from git import Repo, GitCommandError
+
 
 class ModpackManagerApp:
     def __init__(self, root):
