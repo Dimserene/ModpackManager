@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['ModpackManager - tk7.py'],
+    ['ModpackManager - tk8.py'],
     pathex=[],
     binaries=[],
     datas=[],
@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ModpackManager - tk7',
+    name='ModpackManager - tk8',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

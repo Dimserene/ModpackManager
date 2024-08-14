@@ -424,46 +424,57 @@ class ModpackManagerApp:
             messagebox.showerror("Error", f"An error occurred while checking versions: {str(e)}")
 
     def install_lovely_injector(self):
-        # Confirmation dialog to proceed or abort
-        proceed = messagebox.askyesno("Install Lovely Injector", "This installation requires disabling antivirus software temporarily and whitelisting the Balatro game directory. Proceed?")
+        # Prompt user to confirm the installation
+        proceed = messagebox.askyesno("Install Lovely Injector",
+                                      "This installation requires disabling antivirus software temporarily "
+                                      "and whitelisting the Balatro game directory. Proceed?")
         if not proceed:
             messagebox.showinfo("Installation Aborted", "Lovely Injector installation was aborted by the user.")
             return
 
-        messagebox.showwarning("Warning", "Please disable antivirus and whitelist Balatro game directory to proceed.")
-        
         # Determine the default game directory based on the OS
         if platform.system() == "Windows":
             default_game_directory = r"C:\\Program Files (x86)\\Steam\\steamapps\\common\\Balatro"
         else:
             default_game_directory = os.path.expanduser("~/.steam/steam/steamapps/common/Balatro")
 
-        # Check if balatro.exe exists in the default directory
-        balatro_exe_path = os.path.join(default_game_directory, "balatro.exe")
+        game_directory = default_game_directory
+        balatro_exe_path = os.path.join(game_directory, "balatro.exe")
 
+        # Verify existence of balatro.exe or prompt user to select the directory
         if not os.path.exists(balatro_exe_path):
-            # If not found, prompt the user to select the game directory
-            messagebox.showwarning("Game Not Found", "Balatro.exe not found in the default directory. Please select the game directory.")
-            selected_directory = filedialog.askdirectory(title="Select Balatro Game Directory")
-            
-            if not selected_directory:
-                messagebox.showerror("No Directory Selected", "No directory was selected. Lovely Injector installation aborted.")
+            game_directory = filedialog.askdirectory(title="Select Balatro Game Directory",
+                                                     initialdir=os.path.dirname(default_game_directory))
+            if not game_directory:
+                messagebox.showerror("Installation Aborted", "No game directory was selected.")
                 return
-            
-            # Save the selected directory for future use
-            self.custom_install_path = selected_directory
-            game_directory = selected_directory
             balatro_exe_path = os.path.join(game_directory, "balatro.exe")
-        else:
-            game_directory = default_game_directory
-        
-        # Verify if balatro.exe exists in the chosen directory
-        if not os.path.exists(balatro_exe_path):
-            messagebox.showerror("Error", "Balatro.exe not found in the selected directory. Lovely Injector installation aborted.")
-            return
-        
-        # Continue with the download and installation process
-        self.download_and_install_lovely(game_directory)
+            if not os.path.exists(balatro_exe_path):
+                messagebox.showerror("Error", "Balatro.exe not found in the selected directory.")
+                return
+
+        # Download and installation process
+        url = "https://github.com/ethangreen-dev/lovely-injector/releases/latest/download/lovely-x86_64-pc-windows-msvc.zip"
+        zip_file_path = os.path.join(game_directory, "lovely-injector.zip")
+        try:
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            with open(zip_file_path, "wb") as file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    file.write(chunk)
+
+            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+                zip_ref.extract("version.dll", game_directory)
+            os.remove(zip_file_path)  # Clean up the zip file after extraction
+            messagebox.showinfo("Install Status", "Lovely Injector installed successfully.")
+        except requests.RequestException as e:
+            messagebox.showerror("Error", f"Failed to download Lovely Injector: {e}")
+            if os.path.exists(zip_file_path):
+                os.remove(zip_file_path)
+        except zipfile.BadZipFile as e:
+            messagebox.showerror("Error", f"Failed to unzip the downloaded file: {e}")
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred during installation: {str(e)}")
 
     def open_discord(self, event=None):
         webbrowser.open("https://discord.com/channels/1116389027176787968/1255696773599592458")
