@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['ModpackManager - tk8.py'],
+    ['C:\\Users\\raul0\\Documents\\Modpack manager\\ModpackManager - tk8.py'],
     pathex=[],
     binaries=[],
     datas=[],

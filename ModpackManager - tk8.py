@@ -24,27 +24,27 @@ class ModpackManagerApp:
 
     def create_widgets(self):
         
-        root.grid_columnconfigure((0,1), weight=1, uniform="column")
+        root.grid_columnconfigure((0,1,2,3), weight=1, uniform="column")
         
         # Title label
         self.title_label = tk.Label(self.root, text="☷☷☷☷Dimserene's Modpack Manager☷☷☷☷", font=('Helvetica', 16))
-        self.title_label.grid(pady=10, row=0, column=0, columnspan=2)
+        self.title_label.grid(pady=10, row=0, column=0, columnspan=4)
 
         # PLAY button
         self.play_button = tk.Button(self.root, text="PLAY", command=self.play_game, font=('Helvetica', 30), height=0, width=10, background='#0087eb')
-        self.play_button.grid(padx=5, pady=5, row=1, column=0, columnspan=2)
+        self.play_button.grid(padx=5, pady=5, row=1, column=0, columnspan=4)
 
         # Installed modpack info
         self.installed_info_label = tk.Label(self.root, text="", font=('Helvetica', 12))
-        self.installed_info_label.grid(padx=5, pady=5, ipady=5, row=2, column=0, columnspan=2)
+        self.installed_info_label.grid(padx=5, pady=5, ipady=5, row=2, column=0, columnspan=4)
 
         # Refresh button
         self.refresh_button = tk.Button(self.root, text="Refresh", command=self.update_installed_info)
-        self.refresh_button.grid(padx=5, pady=5, row=3, column=0, columnspan=2)
+        self.refresh_button.grid(padx=5, pady=5, row=3, column=0, columnspan=4)
 
         # Modpack selection dropdown
         self.modpack_label = tk.Label(self.root, text="Select Modpack:")
-        self.modpack_label.grid(padx=5, ipady=5, row=4, column=0, columnspan=2)
+        self.modpack_label.grid(padx=5, ipady=5, row=4, column=0, columnspan=4)
 
         self.modpack_var = tk.StringVar()
         self.modpack_dropdown = ttk.Combobox(self.root, textvariable=self.modpack_var)
@@ -53,33 +53,36 @@ class ModpackManagerApp:
             "Fine-tuned-Pack",
             "Vanilla-Plus-Pack"
         ]
-        self.modpack_dropdown.grid(padx=5, ipady=5, row=5, column=0, columnspan=2)
+        self.modpack_dropdown.grid(padx=5, ipady=5, row=5, column=0, columnspan=4)
         self.modpack_dropdown.current(0)
 
         # Create buttons
         self.download_button = tk.Button(self.root, text="Download", command=self.download_modpack, font=('Helvetica', 16))
-        self.download_button.grid(padx=10, pady=5, ipady=5, row=6, column=0, columnspan=1, sticky="WE")
+        self.download_button.grid(padx=10, pady=5, ipady=5, row=6, column=0, columnspan=2, sticky="WE")
 
         self.install_button = tk.Button(self.root, text="Install (Copy)", command=self.install_modpack, font=('Helvetica', 16))
-        self.install_button.grid(padx=10, pady=5, ipady=5, row=6, column=1, columnspan=1, sticky="WE")
+        self.install_button.grid(padx=10, pady=5, ipady=5, row=6, column=2, columnspan=2, sticky="WE")
 
         self.update_button = tk.Button(self.root, text="Update", command=self.update_modpack, font=('Helvetica', 16))
-        self.update_button.grid(padx=10, pady=5, ipady=5, row=7, column=0, columnspan=1, sticky="WE")
+        self.update_button.grid(padx=10, pady=5, ipady=5, row=7, column=0, columnspan=2, sticky="WE")
 
         self.uninstall_button = tk.Button(self.root, text="Uninstall", command=self.uninstall_modpack, font=('Helvetica', 16))
-        self.uninstall_button.grid(padx=10, pady=5, ipady=5, row=7, column=1, columnspan=1, sticky="WE")
+        self.uninstall_button.grid(padx=10, pady=5, ipady=5, row=7, column=2, columnspan=2, sticky="WE")
 
         self.check_versions_button = tk.Button(self.root, text="Check Versions", command=self.check_versions, font=('Helvetica', 12))
-        self.check_versions_button.grid(padx=10, pady=5, ipady=5, row=8, column=0, columnspan=1, sticky="WE")
+        self.check_versions_button.grid(padx=10, pady=5, ipady=5, row=8, column=0, columnspan=2, sticky="WE")
 
         self.open_install_directory_button = tk.Button(self.root, text="Open Mods Directory", command=self.open_install_directory, font=('Helvetica', 12))
-        self.open_install_directory_button.grid(padx=10, pady=5, ipady=5, row=8, column=1, columnspan=1, sticky="WE")
+        self.open_install_directory_button.grid(padx=10, pady=5, ipady=5, row=8, column=2, columnspan=2, sticky="WE")
 
         self.install_lovely_button = tk.Button(self.root, text="Install lovely", command=self.install_lovely_injector, font=('Helvetica', 12))
-        self.install_lovely_button.grid(padx=10, pady=5, ipady=5, row=9, column=0, columnspan=1, sticky="WE")
+        self.install_lovely_button.grid(padx=10, pady=5, ipady=5, row=9, column=0, columnspan=2, sticky="WE")
+
+        self.mod_list_button = tk.Button(self.root, text="Mod List", command=self.open_mod_list, font=('Helvetica', 12))
+        self.mod_list_button.grid(padx=10, pady=5, ipady=5, row=9, column=2, columnspan=1, sticky="WE")
 
         self.discord_button = tk.Button(self.root, text="Join Discord", command=self.open_discord, font=('Helvetica', 12))
-        self.discord_button.grid(padx=10, pady=5, ipady=5, row=9, column=1, columnspan=1, sticky="WE")
+        self.discord_button.grid(padx=10, pady=5, ipady=5, row=9, column=3, columnspan=1, sticky="WE")
 
     def play_game(self):
         if platform.system() == "Windows":
@@ -478,6 +481,9 @@ class ModpackManagerApp:
 
     def open_discord(self, event=None):
         webbrowser.open("https://discord.com/channels/1116389027176787968/1255696773599592458")
+
+    def open_mod_list(self, event=None): 
+        webbrowser.open("https://docs.google.com/spreadsheets/d/1L2wPG5mNI-ZBSW_ta__L9EcfAw-arKrXXVD-43eU4og")
 
 def center_window(window, width, height):
     # Get the screen width and height
