@@ -199,24 +199,35 @@ class ModpackManagerApp:
             messagebox.showerror("Error", "Invalid modpack selected.")
 
     def download_modpack(self, clone_url=None):
-        if not clone_url:
-            modpack_name = self.modpack_var.get()
-            clone_url = self.get_modpack_url(modpack_name)
-        
-        if clone_url:
+        try:
+            # Get the clone URL
+            if not clone_url:
+                modpack_name = self.modpack_var.get()
+                clone_url = self.get_modpack_url(modpack_name)
+
+            # Ensure a valid URL is retrieved
+            if not clone_url:
+                messagebox.showerror("Error", "Modpack URL not found. Please ensure you selected a valid modpack.")
+                return
+
             repo_name = clone_url.split('/')[-1].replace('.git', '')
-            
+
             # Check if the repository directory already exists
             if os.path.isdir(repo_name):
                 messagebox.showinfo("Download Status", f"{repo_name} is already downloaded.")
                 return
-            
-            try:
-                Repo.clone_from(clone_url, repo_name, multi_options=["--recurse-submodules", "--remote-submodules"])
-                messagebox.showinfo("Download Status", f"Downloaded {repo_name} successfully.")
-            except GitCommandError as e:
-                messagebox.showerror("Error", f"Failed to download modpack: {str(e)}")
-                print(f"Error during download: {e}")
+
+            # Attempt to clone the repository
+            Repo.clone_from(clone_url, repo_name, multi_options=["--recurse-submodules", "--remote-submodules"])
+            messagebox.showinfo("Download Status", f"Downloaded {repo_name} successfully.")
+
+        except GitCommandError as e:
+            messagebox.showerror("Error", f"Failed to download modpack: {str(e)}")
+            print(f"GitCommandError during download: {e}")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}")
+            print(f"Unexpected error during download: {e}")
 
     def install_modpack(self):
         modpack_name = self.modpack_var.get()
