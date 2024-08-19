@@ -156,7 +156,7 @@ class ModpackManagerApp:
         Hovertip(self.discord_button, "Open Discord server in web browser")
 
         # Modpack Manager Info
-        self.info = tk.Label(self.root, text="Build: 2024/08/20, Iteration: 13th, Version: Release 1.0.0", font=('Helvetica', 8))
+        self.info = tk.Label(self.root, text="Build: 2024/08/20, Iteration: 14th, Version: Release 1.1.0", font=('Helvetica', 8))
         self.info.grid(row=10,column=0, columnspan=6, sticky="E")
 
 
