@@ -106,19 +106,14 @@ class ModpackManagerApp:
         self.modpack_dropdown.current(0)
 
         # Create Download button
-        self.download_button = tk.Button(self.root, text="Download (Clone)", command=self.download_modpack, font=('Helvetica', 16))
-        self.download_button.grid(padx=10, pady=5, ipady=5, row=6, column=0, columnspan=3, sticky="WE")
+        self.download_button = tk.Button(self.root, text="Download / Update", command=self.download_modpack, font=('Helvetica', 16))
+        self.download_button.grid(padx=10, pady=5, ipady=5, row=6, column=0, columnspan=6, sticky="WE")
         Hovertip(self.download_button, "Download (clone) selected modpack to the same directory as manager")
 
         # Create Install button
         self.install_button = tk.Button(self.root, text="Install (Copy)", command=self.install_modpack, font=('Helvetica', 16))
-        self.install_button.grid(padx=10, pady=5, ipady=5, row=6, column=3, columnspan=3, sticky="WE")
+        self.install_button.grid(padx=10, pady=5, ipady=5, row=7, column=0, columnspan=3, sticky="WE")
         Hovertip(self.install_button, "Copy (install) Mods content")
-
-        # Create Update button
-        self.update_button = tk.Button(self.root, text="Update (Reclone)", command=self.update_modpack, font=('Helvetica', 16))
-        self.update_button.grid(padx=10, pady=5, ipady=5, row=7, column=0, columnspan=3, sticky="WE")
-        Hovertip(self.update_button, "Force reclone selected modpack")
 
         # Create Uninstall button
         self.uninstall_button = tk.Button(self.root, text="Uninstall (Remove)", command=self.uninstall_modpack, font=('Helvetica', 16))
@@ -156,7 +151,7 @@ class ModpackManagerApp:
         Hovertip(self.discord_button, "Open Discord server in web browser")
 
         # Modpack Manager Info
-        self.info = tk.Label(self.root, text="Build: 2024/08/20, Iteration: 14th, Version: Release 1.1.1", font=('Helvetica', 8))
+        self.info = tk.Label(self.root, text="Build: 2024/08/21, Iteration: 14th, Version: Release 1.1.2", font=('Helvetica', 8))
         self.info.grid(row=10,column=0, columnspan=6, sticky="E")
 
 
@@ -702,7 +697,7 @@ class ModpackManagerApp:
 
             # Prompt force download if the repository directory already exists
             if os.path.isdir(repo_name):
-                proceed = messagebox.askyesno("Confirm download", f"{repo_name} is already downloaded. Download anyway?")
+                proceed = messagebox.askyesno("Confirm Update", f"{repo_name} is already downloaded. Update/Reclone?")
                 try:
                     if proceed:
                         shutil.rmtree(repo_name, onexc=readonly_handler)
@@ -904,57 +899,6 @@ class ModpackManagerApp:
         self.save_preferences(mod_vars)
         self.excluded_mods = self.read_preferences()
         self.install_mods(popup)
-
-
-    def update_modpack(self):
-
-        self.settings = self.load_settings()
-
-        modpack_name = self.modpack_var.get()
-        clone_url = self.get_modpack_url(modpack_name)
-        repo_name = clone_url.split('/')[-1].replace('.git', '')
-        repo_path = os.path.join(os.getcwd(), repo_name)
-        mods_src = os.path.join(repo_path, 'Mods')
-        install_path = self.mods_dir
-
-        # Confirm the uninstallation
-        if messagebox.askyesno("Confirm Update", "This will perform a clean reclone which will wipe both downloaded and currently installed modpacks. Proceed?"):
-            try:
-                # Check modpack downloaded
-                if not os.path.isdir(repo_path):
-                    messagebox.showerror("Error", "Modpack not found. Please download modpack first.")
-                    return
-
-                # Delete if the repository directory already exists
-                if os.path.isdir(repo_path):
-                    shutil.rmtree(repo_path, onexc=readonly_handler)
-
-                # Get the clone URL
-                if not clone_url:
-                    modpack_name = self.modpack_var.get()
-                    clone_url = self.get_modpack_url(modpack_name)
-
-                # Ensure a valid URL is retrieved
-                if not clone_url:
-                    messagebox.showerror("Error", "Modpack URL not found. Please ensure you selected a valid modpack.")
-                    return
-
-                # Attempt to clone the repository
-                Repo.clone_from(clone_url, repo_name, multi_options=["--recurse-submodules", "--remote-submodules"])
-
-                if os.path.exists(install_path):
-                    shutil.rmtree(install_path, ignore_errors=True)
-
-                shutil.copytree(mods_src, install_path)
-                messagebox.showinfo("Update Status", "Successfully updated modpack.")
-
-            except GitCommandError as e:
-                messagebox.showerror("Error", f"Failed to update modpack: {str(e)}, Please try again.")
-                print(f"GitCommandError during download: {e}")
-
-            except Exception as e:
-                messagebox.showerror("Error", f"An unexpected error occurred: {str(e)}, Please try again.")
-                print(f"Unexpected error during download: {e}")
         
     def uninstall_modpack(self):
 
