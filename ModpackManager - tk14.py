@@ -156,7 +156,7 @@ class ModpackManagerApp:
         Hovertip(self.discord_button, "Open Discord server in web browser")
 
         # Modpack Manager Info
-        self.info = tk.Label(self.root, text="Build: 2024/08/20, Iteration: 14th, Version: Release 1.1.0", font=('Helvetica', 8))
+        self.info = tk.Label(self.root, text="Build: 2024/08/20, Iteration: 14th, Version: Release 1.1.1", font=('Helvetica', 8))
         self.info.grid(row=10,column=0, columnspan=6, sticky="E")
 
 
@@ -229,6 +229,8 @@ class ModpackManagerApp:
         profile_name_var = tk.StringVar(popup)
         if exe_files:
             profile_name_var.set(self.settings["profile_name"])  # Set default selection to first executable found
+        else:
+            profile_name_var.set("Balatro")
 
         profile_name_dropdown = ttk.Combobox(popup, textvariable=profile_name_var, values=exe_files)
         profile_name_dropdown.grid(column=0, row=7, columnspan=2, pady=5, padx=5)
@@ -243,7 +245,7 @@ class ModpackManagerApp:
         # Save and Cancel Buttons
         self.save_settings_button = tk.Button(popup, text="Save", command=lambda: self.save_settings(popup, game_dir_entry.get(), mods_dir_entry.get(), profile_name_var.get()))
         self.save_settings_button.grid(column=0, row=10, padx=20, pady=20, sticky="WE")
-        self.cancel_settings_button = tk.Button(popup, text="Cancel", command=popup.destroy)
+        self.cancel_settings_button = tk.Button(popup, text="Cancel", command=lambda: self.close_settings_popup(popup))
         self.cancel_settings_button.grid(column=1, row=10, padx=20, pady=20, sticky="WE")
 
         # Close event handler to reset the flag when the window is closed
@@ -254,6 +256,9 @@ class ModpackManagerApp:
         # When the popup is closed, reset the flag
         popup.protocol("WM_DELETE_WINDOW", settings_on_close)
 
+    def close_settings_popup(self, popup):
+        self.settings_popup_open = False
+        popup.destroy()
        
 ############################################################
 
@@ -263,30 +268,44 @@ class ModpackManagerApp:
 
     # Function to load settings from the JSON file
     def load_settings(self):
-        if os.path.exists(SETTINGS_FILE):
+        if not os.path.exists(SETTINGS_FILE):
+            # If no settings file exists, create it with default settings
+            with open(SETTINGS_FILE, "w") as f:
+                json.dump(DEFAULT_SETTINGS, f, indent=4)
+            return DEFAULT_SETTINGS.copy()
+        else:
+            # Load existing settings from the file
             with open(SETTINGS_FILE, "r") as f:
                 return json.load(f)
-        else:
-            # If no settings file exists, return default settings
-            return DEFAULT_SETTINGS.copy()
 
     # Function to save settings to the JSON file
-    def save_settings(self, popup, game_directory, mods_directory, profile_name, mod_vars):
-        self.settings["game_directory"] = game_directory
-        self.settings["profile_name"] = profile_name
-        self.settings["mods_directory"] = mods_directory
-        with open(SETTINGS_FILE, "w") as f:
-            json.dump(self.settings, f, indent=4)
+    def save_settings(self, popup, game_directory, mods_directory, profile_name):
+        try:
+            # Save the settings to the settings dictionary
+            self.settings["game_directory"] = game_directory
+            self.settings["profile_name"] = profile_name
+            self.settings["mods_directory"] = mods_directory
 
-        messagebox.showinfo("Settings", "Settings have been saved successfully.")
+            # Write the settings to the JSON file
+            with open(SETTINGS_FILE, "w") as f:
+                json.dump(self.settings, f, indent=4)
 
-        self.settings = self.load_settings()
+            # Show a confirmation message
+            messagebox.showinfo("Settings", "Settings have been saved successfully.")
+            
+            # Reload the settings after saving
+            self.settings = self.load_settings()
 
-        self.settings_popup_open = False
-        popup.destroy()    
+            # Close the popup
+            self.settings_popup_open = False
+            popup.destroy()
+
+        except Exception as e:
+            # Display an error message if the save operation fails
+            messagebox.showerror("Error", f"Failed to save settings: {str(e)}")
 
     # Function to reset settings to defaults
-    def reset_to_default(self, game_dir_entry, mods_dir_entry, profile_name_entry):
+    def reset_to_default(self, game_dir_entry, mods_dir_entry, profile_name_var):
         self.settings = DEFAULT_SETTINGS.copy()
         game_dir_entry.config(state="normal")
         game_dir_entry.delete(0, tk.END)
@@ -298,8 +317,8 @@ class ModpackManagerApp:
         mods_dir_entry.insert(0, os.path.expandvars(self.settings["mods_directory"]))
         mods_dir_entry.config(state="readonly")
 
-        profile_name_entry.delete(0, tk.END)
-        profile_name_entry.insert(0, self.settings["profile_name"])
+        # Reset profile name
+        profile_name_var.set(self.settings["profile_name"])  # Use set() to reset the profile name
 
     # Function to browse and update the directory
     def browse_directory(self, entry_widget, readonly):
@@ -608,14 +627,15 @@ class ModpackManagerApp:
 
         self.settings = self.load_settings()
 
+        install_path = self.settings["mods_directory"]
+        mods_path = os.path.join(install_path, 'ModpackUtil')
+
+        current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
+        modpack_util_file = os.path.join(mods_path, 'ModpackUtil.lua')
+
+        current_version = None
+
         try:
-            install_path = self.settings["mods_directory"]
-            mods_path = os.path.join(install_path, 'ModpackUtil')
-
-            current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
-            modpack_util_file = os.path.join(mods_path, 'ModpackUtil.lua')
-
-            current_version = None
             if os.path.exists(current_version_file):
                 try:
                     with open(current_version_file, 'r') as file:
@@ -749,6 +769,11 @@ class ModpackManagerApp:
             return []
         
     def popup_mod_selection(self, mod_list):
+
+        # Prevent opening multiple settings popups
+        if self.install_popup_open:
+            return
+        
         # Mark the install popup as open
         self.install_popup_open = True
 
@@ -803,15 +828,15 @@ class ModpackManagerApp:
 
         # Add "Clear All" button
         clear_button = tk.Button(popup, text="Clear All", command=clear_all)
-        clear_button.grid(row=mods_per_column + 1, column=num_columns-3, pady=10)
+        clear_button.grid(row=mods_per_column + 1, column=0, pady=10)
 
         # Add "Reverse Select" button
         reverse_button = tk.Button(popup, text="Reverse Select", command=reverse_select)
-        reverse_button.grid(row=mods_per_column + 1, column=num_columns-2, pady=10)
+        reverse_button.grid(row=mods_per_column + 1, column=1, pady=10)
 
         # Save and install button (place below the checkboxes)
         save_button = tk.Button(popup, text="Save & Install", command=lambda: self.save_and_install(mod_vars, popup))
-        save_button.grid(row=mods_per_column + 1, column=num_columns-1, pady=10)
+        save_button.grid(row=mods_per_column + 1, column=2, pady=10)
 
         # Close event handler to reset the flag when the window is closed
         def settings_on_close():
@@ -835,11 +860,14 @@ class ModpackManagerApp:
         print(f"Excluded mods: {self.excluded_mods}")  # Debugging
 
     def read_preferences(self):
-        # Read the excluded mods from the preferences file
-        if os.path.exists(INSTALL_FILE):
+        # If the preferences file doesn't exist, create an empty one
+        if not os.path.exists(INSTALL_FILE):
+            with open(INSTALL_FILE, "w") as f:
+                f.write("")  # Create an empty file
+            return []  # Return an empty list of excluded mods
+        else:
             with open(INSTALL_FILE, "r") as f:
                 return [line.strip() for line in f.readlines()]
-        return []
 
     def install_mods(self, popup):
         modpack_name = self.modpack_var.get()
