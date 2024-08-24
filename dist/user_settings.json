@@ -1,5 +1,6 @@
 {
     "game_directory": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Balatro",
-    "profile_name": "Balatro - Modded",
-    "mods_directory": "C:\\Users\\raul0\\AppData\\Roaming\\Balatro - Modded\\Mods"
+    "profile_name": "Balatro",
+    "mods_directory": "%AppData%\\Balatro\\Mods",
+    "modpack": "Dimserenes-Modpack"
 }

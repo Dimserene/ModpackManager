@@ -151,7 +151,7 @@ class ModpackManagerApp:
         Hovertip(self.discord_button, "Open Discord server in web browser")
 
         # Modpack Manager Info
-        self.info = tk.Label(self.root, text="Build: 2024/08/21, Iteration: 14th, Version: Release 1.1.2", font=('Helvetica', 8))
+        self.info = tk.Label(self.root, text="Build: 2024/08/21, Iteration: 14th, Version: Release 1.1.3", font=('Helvetica', 8))
         self.info.grid(row=10,column=0, columnspan=6, sticky="E")
 
 
@@ -622,7 +622,7 @@ class ModpackManagerApp:
 
         self.settings = self.load_settings()
 
-        install_path = self.settings["mods_directory"]
+        install_path = os.path.expandvars(self.settings["mods_directory"])
         mods_path = os.path.join(install_path, 'ModpackUtil')
 
         current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
@@ -746,10 +746,6 @@ class ModpackManagerApp:
             if not os.path.exists(install_path):
                 os.makedirs(install_path)
 
-            # Remove the existing Mods folder if it exists
-            if os.path.isdir(install_path):
-                shutil.rmtree(install_path, ignore_errors=True)
-
             # Pop up mod selection window
             self.popup_mod_selection(mod_list)
 
@@ -870,8 +866,11 @@ class ModpackManagerApp:
         repo_name = clone_url.split('/')[-1].replace('.git', '')
         repo_path = os.path.join(os.getcwd(), repo_name)
         mods_src = os.path.join(repo_path, 'Mods')
-        install_path = self.mods_dir
         
+        # Remove the existing Mods folder if it exists
+        if os.path.isdir(self.mods_dir):
+            shutil.rmtree(self.mods_dir, ignore_errors=True)
+
         # Ensure install directory exists
         if not os.path.exists(self.mods_dir):
             os.makedirs(self.mods_dir)
@@ -880,7 +879,7 @@ class ModpackManagerApp:
         for mod in self.get_mod_list(mods_src):
             if mod not in self.excluded_mods:
                 source_mod_path = os.path.join(mods_src, mod)
-                destination_mod_path = os.path.join(install_path, mod)
+                destination_mod_path = os.path.join(self.mods_dir, mod)
                 
                 # Copy the mod folder to the installation directory
                 try:
@@ -891,7 +890,7 @@ class ModpackManagerApp:
                 except Exception as e:
                     messagebox.showerror("Error", f"Failed to install mod: {mod}. Error: {e}")
                     return
-                
+        self.install_popup_open = False
         popup.destroy()        
         messagebox.showinfo("Install Status", "Successfully installed modpack.")
         

@@ -2,11 +2,11 @@
 
 
 a = Analysis(
-    ['C:\\Users\\raul0\\Documents\\ModpackManager\\ModpackManager - tk14.py'],
+    ['ModpackManager - tk14.py'],
     pathex=[],
     binaries=[],
     datas=[],
-    hiddenimports=['tkinter', 'gitpython', 'requests'],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
