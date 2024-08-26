@@ -3,3 +3,4 @@
 /dist/Fine-tuned-Pack/
 /dist/Vanilla-Plus-Pack/
 *.spec
+*.json
