@@ -2,5 +2,7 @@
 /dist/Dimserenes-Modpack/
 /dist/Fine-tuned-Pack/
 /dist/Vanilla-Plus-Pack/
+/dist/Insane-Pack/
+/dist/Cruel-Pack/
 *.spec
 *.json

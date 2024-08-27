@@ -102,7 +102,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.modpack_var.addItems([
             "Dimserenes-Modpack",
             "Fine-tuned-Pack",
-            "Vanilla-Plus-Pack"
+            "Vanilla-Plus-Pack",
+            "Insane-Pack",
+            "Cruel-Pack"
         ])
         layout.addWidget(self.modpack_var, 4, 1, 1, 5)
         self.modpack_var.setStyleSheet("""
@@ -186,7 +188,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.discord_button.setToolTip("Open Discord server in web browser")
 
         # Modpack Manager Info
-        self.info = QLabel("Build: 2024/08/26, Iteration: 17, Version: Release 1.2.2", self)
+        self.info = QLabel("Build: 2024/08/27, Iteration: 17, Version: Release 1.2.3", self)
         self.info.setStyleSheet("font: 8pt 'Helvetica';")
         layout.addWidget(self.info, 10, 0, 1, 6, alignment=Qt.AlignmentFlag.AlignRight)
 
@@ -976,7 +978,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         repos = {
             "Full(Extreme)": ("Dimserene", "Dimserenes-Modpack"),
             "Fine-tuned": ("Dimserene", "Fine-tuned-Pack"),
-            "Vanilla+": ("Dimserene", "Vanilla-Plus-Pack")
+            "Vanilla+": ("Dimserene", "Vanilla-Plus-Pack"),
+            "Insane": ("Dimserene", "Insane-Pack"),
+            "Cruel": ("Dimserene", "Cruel-Pack")
         }
         commit_messages = {}
         for repo_name, (owner, name) in repos.items():
@@ -1071,7 +1075,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         urls = {
             "Dimserenes-Modpack": "https://github.com/Dimserene/Dimserenes-Modpack.git",
             "Fine-tuned-Pack": "https://github.com/Dimserene/Fine-tuned-Pack.git",
-            "Vanilla-Plus-Pack": "https://github.com/Dimserene/Vanilla-Plus-Pack.git"
+            "Vanilla-Plus-Pack": "https://github.com/Dimserene/Vanilla-Plus-Pack.git",
+            "Insane-Pack": "https://github.com/Dimserene/Insane-Pack.git",
+            "Cruel-Pack": "https://github.com/Dimserene/Cruel-Pack.git"
         }
         return urls.get(modpack_name, "")
 
