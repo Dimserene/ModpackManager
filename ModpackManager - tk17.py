@@ -1,9 +1,9 @@
 import os, re, shutil, requests, webbrowser, subprocess, zipfile, stat, json, git, time
 from datetime import datetime
 from git import GitCommandError, Repo
-from PyQt6.QtGui import QDesktopServices, QAction
+from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer
-from PyQt6.QtWidgets import QMenuBar, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
+from PyQt6.QtWidgets import QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
 
 ############################################################
 # Default settings
@@ -120,9 +120,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Download button
         self.download_button = QPushButton("Download / Update", self)
         self.download_button.setStyleSheet("font: 16pt 'Helvetica';")
-        layout.addWidget(self.download_button, 5, 0, 1, 6)
+        layout.addWidget(self.download_button, 5, 0, 1, 4)
         self.download_button.clicked.connect(self.download_modpack)
         self.download_button.setToolTip("Download (clone) selected modpack to the same directory as manager")
+
+        # Quick Update button
+        self.update_button = QPushButton("Quick Update", self)
+        self.update_button.setStyleSheet("font: 16pt 'Helvetica';")
+        layout.addWidget(self.update_button, 5, 4, 1, 2)
+        self.update_button.clicked.connect(self.update_modpack)
+        self.update_button.setToolTip("Quickly update downloaded modpacks (can be malfunctioned)")
 
         # Install button
         self.install_button = QPushButton("Install (Copy)", self)
@@ -1164,6 +1171,33 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.setText(f"An unexpected error occurred: {str(e)}")
             msg_box.exec()
             print(f"Unexpected error during download: {e}")
+
+    def update_modpack(self):
+        modpack_name = self.modpack_var.currentText()
+        clone_url = self.get_modpack_url(modpack_name)
+        repo_name = clone_url.split('/')[-1].replace('.git', '')
+        repo_path = os.path.join(os.getcwd(), repo_name)
+
+        # Check if the repository exists
+        if not os.path.isdir(repo_path):
+            QMessageBox.critical(self, "Error", "Repository not found. Attempting to clone it.")
+            self.download_modpack(clone_url)  # Attempt to download the modpack if it's not found
+            return
+
+        # Update the modpack
+        try:
+            repo = Repo(repo_path)
+
+            # Perform git pull and submodule update
+            repo.remotes.origin.pull()
+            for submodule in repo.submodules:
+                submodule.update(init=True, recursive=True)
+
+            QMessageBox.information(self, "Update Status", "Modpack updated successfully.")
+        except GitCommandError as e:
+            QMessageBox.critical(self, "Error", f"Failed to update modpack: {str(e)}")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An unexpected error occurred: {str(e)}")
 
     def install_modpack(self):
 
