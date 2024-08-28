@@ -986,8 +986,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             "Full(Extreme)": ("Dimserene", "Dimserenes-Modpack"),
             "Fine-tuned": ("Dimserene", "Fine-tuned-Pack"),
             "Vanilla+": ("Dimserene", "Vanilla-Plus-Pack"),
-            "Insane": ("Dimserene", "Insane-Pack"),
-            "Cruel": ("Dimserene", "Cruel-Pack")
+            "Insane Pack": ("Dimserene", "Insane-Pack"),
+            "Cruel Pack": ("Dimserene", "Cruel-Pack")
         }
         commit_messages = {}
         for repo_name, (owner, name) in repos.items():
@@ -1537,7 +1537,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             update_message = ""
 
             for repo_name, commit_message in commit_messages.items():
-                version_info += f"{repo_name}: {commit_message}\n"
+                version_info += f"{repo_name}:\t{commit_message}\n"
 
                 if pack_name == repo_name:
                     if current_version and commit_message != current_version:
