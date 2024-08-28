@@ -19,7 +19,7 @@ DEFAULT_SETTINGS = {
 # File path for settings
 
 SETTINGS_FILE = "user_settings.json"
-INSTALL_FILE = "excluded_mods.json"
+INSTALL_FILE = "excluded_mods.json" 
 
 ############################################################
 # Initialize Program
