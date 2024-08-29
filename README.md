@@ -16,7 +16,7 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
    - Get the latest Modpack Manager executable file from the release.
 
 2. **Launch**:
-   - Double-click the `modpack_manager-version.exe` file to start the program.
+   - Double-click the `modpack_manager-(version).exe` file to start the program.
 
 ## Features
 
@@ -79,8 +79,6 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 
 3. **Perform Actions**:
    - Use the buttons in the interface to check versions, download modpacks, install mods, or update them.
-   - Directions for First time users:
-     - install(or update) lovely -> select modpack -> download -> install -> save & install
 
 4. **Set Paths & Open Folder**:
    - Go to settings to customize your game and mod install paths.
