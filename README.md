@@ -28,59 +28,47 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 ### Game Launch
 
 - **(1) PLAY**:
-  - Start the game directly from the Modpack Manager.
-  - This button launches the game using the currently installed modpack.
+  - Start the game directly from the Modpack Manager with currently installed modpack.
 
-### Additional Functions
+### Modpack Management
 
 - **(2) Installed Pack Information**:
-  - Displays the name and version of the currently installed modpack, including the installation date.
+  - Displays the name and version of the currently installed modpack.
 
 - **(3) Refresh**:
-  - Refreshes the displayed information to reflect any recent changes in the modpack or version.
+  - Refreshes the displayed information to currently installed modpack.
 
 - **(4) Select Modpack**:
   - Dropdown menu to choose which modpack you want to manage.
   - Ensure the correct modpack is selected before performing any actions.
 
-### Modpack Management
-
 - **(5) Download / Update**:
   - Choose and download your desired modpacks easily.
-  - This button fetches the latest modpacks from GitHub and updates the currently selected modpack.
+  - This button fetches the latest modpacks from GitHub and updates (reclone) the currently selected modpack.
 
 - **(6) Quick Update**:
-  - Quickly update the currently installed modpack without altering any other settings or reinstalling components.
+  - Quickly update the currently installed modpack (if failed, please perform reclone).
 
 - **(7) Install (Copy)**:
-  - Choose which mods to install. Essential mods like `ModpackUtil` and `Steamodded` are forced to be included.
-  - This button copies the selected modpack’s `Mods` folder into the game’s mod directory.
+  - Choose which mods to install.
+  - Essential mods like `ModpackUtil` and `Steamodded` are forced to be included.
 
 - **(8) Uninstall (Remove)**:
   - Uninstall the selected modpack by removing its files from the game’s mod directory.
-  - This helps you keep your game clean and free of unwanted mods.
 
 ### Misc. Functions
 
 - **(9) Time Travel**:
-  - Roll back to an earlier version of a modpack if needed using a dropdown menu.
-  - This feature allows you to revert to previous versions based on commit history.
+  - Roll back to an earlier version of a modpack or revert to current state using a dropdown menu.
 
 - **(10) Backup Save**:
   - You can set a time interval for how often backups occur, ensuring your progress is always safe.
-  - This button allows you to configure and manage your backups.
-
-### Modpack Management (Continued)
 
 - **(11) Check Versions**:
   - Check the version of your installed modpack and compare it to the latest available version online.
-  - This ensures that you are always up-to-date.
-
-### Game Launch (Continued)
 
 - **(12) Install/Update Lovely**:
   - The Lovely Injector can be installed and updated directly in the manager.
-  - Use this button to handle the installation or updating of the Lovely Injector, which is necessary for certain mods to function correctly.
 
 ### User Preferences
 
