@@ -70,24 +70,22 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 - **(12) Install/Update Lovely**:
   - The Lovely Injector can be installed and updated directly in the manager.
 
+### Discord Integration
+
+- **(13) Join Discord**:
+  - Click the Discord button to join our community for help and updates.
+
 ### User Preferences
 
-- **(13) Settings**:
+- **(14) Settings**:
   - Customize your game executable, mods install paths, and profile management in the settings menu.
-  - This button opens a popup menu where you can access and modify these paths.
-  - Save your settings so you don’t have to configure them every time.
-  - The paths you set and save are used automatically each time you open the Modpack Manager.
-  - Access the relevant folders directly from the settings menu via the **Open Folder** function within the **Settings** popup.
+  - The paths you set and saved are used automatically each time you open the Modpack Manager.
+  - Access the relevant folders directly from the settings menu.
 
-### Discord Integration & Mod List
+### Mod List
 
-- **(14) Join Discord**:
-  - Click the Discord button to join our community for help and updates.
-  - This button connects you with other users and provides access to community support.
-
-- **(14) Mod List**:
+- **(15) Mod List**:
   - Access the mod list in Google Spreadsheets.
-  - This button allows you to view and manage the mods currently installed in your game.
 
 ## How to Use
 
