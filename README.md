@@ -1,6 +1,6 @@
 # Dimserene's Modpack Manager
 
-> Directions for First time users: install(or update) lovely -> select modpack -> download -> install -> save & install
+**Directions for First time users: install(or update) lovely -> select modpack -> download -> install -> save & install**
 
 ## Introduction
 
