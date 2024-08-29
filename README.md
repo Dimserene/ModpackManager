@@ -63,7 +63,7 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 
 ![Alt text](https://github.com/Dimserene/ModpackManager/blob/main/images/image2.png)
 
-     - **(a) Version Dropdown**:
+   - **(a) Version Dropdown**:
      - Select the desired version of the modpack to revert to from the dropdown list.
 
    - **(b) Submit Button**:
@@ -73,13 +73,42 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
      - Displays the hash of the selected version, which uniquely identifies the commit for that version.
 
    - **(d) Revert to Current Button**:
-     - Click this button to revert back to the currently installed version of the modpack.
+     - Click this button to revert back to the latest version you've downloaded.
 
    - **(e) Time Travel Button**:
      - Initiates the process of reverting the modpack to the selected version.
 
 - **(10) Backup Save**:
   - You can set a time interval for how often backups occur, ensuring your progress is always safe.
+
+![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/image3.png)
+
+   - **(f) Interval Input**:
+     - Set the interval (in seconds) for automatic backups.
+   
+   - **(g) Preset Interval Buttons**:
+     - Quick buttons for setting common backup intervals.
+   
+   - **(h) Backup Selection Dropdown**:
+     - Allows selection of custom backup file from a dropdown menu.
+   
+   - **(i) Load Button**:
+     - Reload existing backup files.
+   
+   - **(j) Restore Backup Button**:
+     - Restore a previous backup from the selected backup, and turn current save into backup file.
+   
+   - **(k) Delete All Button**:
+     - Deletes all existing backups. Use with caution to ensure no important backups are lost.
+   
+   - **(l) Open Folder Button**:
+     - Opens the folder where backups are stored.
+   
+   - **(m) Start Button**:
+     - Begins the automatic backup process based on the set interval.
+   
+   - **(n) Stop Button**:
+     - Stops the automatic backup process, preventing further backups until restarted.
 
 - **(11) Check Versions**:
   - Check the version of your installed modpack and compare it to the latest available version online.
@@ -96,8 +125,26 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 
 - **(14) Settings**:
   - Customize your game executable, mods install paths, and profile management in the settings menu.
-  - The paths you set and saved are used automatically each time you open the Modpack Manager.
-  - Access the relevant folders directly from the settings menu.
+ 
+![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/image3.png)
+
+   - **(o) Game Directory**:
+     - Manages the path to the game’s executable directory. This path can be browsed or opened directly from this section.
+   
+   - **(p) Mods Directory**:
+     - Manages the path to the Mods folder where modpacks are installed. This path can also be browsed or opened directly.
+   
+   - **(q) Profile Name**:
+     - select or enter the name of the game profile and executable, good for seperating vanilla game or different modpack installation.
+   
+   - **(r) Set/Create Button**:
+     - After entering a profile name, use this button to set or create the profile if not exist.
+   
+   - **(s) Reset to Default Button**:
+     - Resets all settings to their default values, discarding any custom configurations.
+   
+   - **(t) Save Button**:
+     - Saves the current settings and configurations, ensuring they are retained for future use.
 
 ### Mod List
 
@@ -109,24 +156,24 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 1. **Start the Program**:
    - Double-click the executable to open the Modpack Manager.
 
-2. **Select a Modpack**:
+2. **Select a Modpack(4)**:
    - Choose your modpack and select the mods you want to install.
 
 3. **Perform Actions**:
-   - Use the buttons in the interface to check versions, download modpacks, install mods, or update them.
+   - Use the buttons in the interface to check versions(11), download modpacks(5), install mods(7), or update them(5 or 6).
 
 4. **Set Paths & Open Folder**:
-   - Go to settings to customize your game and mod install paths.
+   - Go to settings(14) to customize your game(o) and mod(p) install paths.
    - Open relavent folders from here.
-   - Save your preferences for future use.
+   - Save your preferences(t) for future use.
 
-5. **Launch the Game**:
+5. **Launch the Game(1)**:
    - After installing mods, launch the game directly from the Modpack Manager.
 
-6. **Revert Versions**:
+6. **Revert Versions(9)**:
    - You can use the "Time Travel" feature to go back to an earlier version if needed.
 
-7. **Configure Auto Backup**:
+7. **Configure Auto Backup(10)**:
    - Set a time interval for the automatic backup of your game saves.
    - The Modpack Manager will regularly back up your saves according to the interval you choose, ensuring your progress is always protected.
 
