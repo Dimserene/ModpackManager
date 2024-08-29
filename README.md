@@ -181,6 +181,7 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 ## Troubleshooting
 
 ![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image1.webp)
+
 ![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image4.webp)
 Remove downloaded modpack folder manually and download again.
 
