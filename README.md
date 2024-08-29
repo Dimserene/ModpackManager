@@ -21,7 +21,7 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 
 ## Features
 
-[!Alttext](https://github.com/Dimserene/ModpackManager/blob/main/images/image1.png)
+![Alt text](https://github.com/Dimserene/ModpackManager/blob/main/images/image1.png)
 
 ## Features
 
@@ -60,6 +60,23 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 
 - **(9) Time Travel**:
   - Roll back to an earlier version of a modpack or revert to current state using a dropdown menu.
+
+![Alt text](https://github.com/Dimserene/ModpackManager/blob/main/images/image2.png)
+
+     - **(a) Version Dropdown**:
+     - Select the desired version of the modpack to revert to from the dropdown list.
+
+   - **(b) Submit Button**:
+     - After selecting a version, click this button to submit the selected version for further processing.
+
+   - **(c) Hash Display**:
+     - Displays the hash of the selected version, which uniquely identifies the commit for that version.
+
+   - **(d) Revert to Current Button**:
+     - Click this button to revert back to the currently installed version of the modpack.
+
+   - **(e) Time Travel Button**:
+     - Initiates the process of reverting the modpack to the selected version.
 
 - **(10) Backup Save**:
   - You can set a time interval for how often backups occur, ensuring your progress is always safe.
