@@ -9,7 +9,7 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 ## System Requirements
 
 - **Operating System**: Windows 10 or later (may add other platforms later)
-- 
+- **Prerequisites**: Git [[Download]](https://git-scm.com/)
 
 ## Installation
 
@@ -180,11 +180,23 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 
 ## Troubleshooting
 
-(WIP)
+![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image1.webp)
+![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image4.webp)
+Remove downloaded modpack folder manually and download again.
+
+![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image2.webp)
+Install prerequisite [Git](https://git-scm.com/).
+
+![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image3.webp)
+Reboot your device and try again.
+
+![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image5.webp)
+The modpack manager is in the middle of downloading/updating modpacks or your game is currently launched via manager. Please be patient and wait for it to finish process.
+
 
 ## Support
 
-For help, click the Discord button in the Modpack Manager to join our community.
+For further help, click the Discord button in the Modpack Manager to join our community.
 
 ---
 
