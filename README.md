@@ -186,13 +186,19 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 
 Remove downloaded modpack folder manually and download again.
 
+
+
 ![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image2.webp)
 
 Install prerequisite [Git](https://git-scm.com/).
 
+
+
 ![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image3.webp)
 
 Reboot your device and try again.
+
+
 
 ![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/Trouble%20Shooting/image5.webp)
 
