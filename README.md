@@ -126,7 +126,7 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 - **(14) Settings**:
   - Customize your game executable, mods install paths, and profile management in the settings menu.
  
-![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/image3.png)
+![Alt Text](https://github.com/Dimserene/ModpackManager/blob/main/images/image4.png)
 
    - **(o) Game Directory**:
      - Manages the path to the game’s executable directory. This path can be browsed or opened directly from this section.
