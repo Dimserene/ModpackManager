@@ -1025,7 +1025,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def fetch_commit_messages(self):
         repos = {
-            "Full(Extreme)": ("Dimserene", "Dimserenes-Modpack"),
+            "Full": ("Dimserene", "Dimserenes-Modpack"),
             "Fine-tuned": ("Dimserene", "Fine-tuned-Pack"),
             "Vanilla+": ("Dimserene", "Vanilla-Plus-Pack"),
             "Insane Pack": ("Dimserene", "Insane-Pack"),
