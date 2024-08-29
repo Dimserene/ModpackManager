@@ -9,6 +9,7 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
 ## System Requirements
 
 - **Operating System**: Windows 10 or later (may add other platforms later)
+- 
 
 ## Installation
 
@@ -19,6 +20,8 @@ Welcome to Dimserene's Modpack Manager! This tool helps you easily manage custom
    - Double-click the `modpack_manager-(version).exe` file to start the program.
 
 ## Features
+
+[!Alttext](https://github.com/Dimserene/ModpackManager/blob/main/images/image1.png)
 
 ### Modpack Management
 
