@@ -21,6 +21,10 @@ DEFAULT_SETTINGS = {
 SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 
+DATE = "2024/08/29"
+ITERATION = "17"
+VERSION = "1.2.6"
+
 ############################################################
 # Initialize Program
 ############################################################
@@ -167,7 +171,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.check_versions_button.setToolTip("Check latest version for all modpacks")
 
         # Install Lovely button
-        self.install_lovely_button = QPushButton("Install lovely", self)
+        self.install_lovely_button = QPushButton("Install/Update lovely", self)
         self.install_lovely_button.setStyleSheet("font: 12pt 'Helvetica';")
         layout.addWidget(self.install_lovely_button, 8, 3, 1, 3)
         self.install_lovely_button.clicked.connect(self.install_lovely_injector)
@@ -194,8 +198,12 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.discord_button.clicked.connect(self.open_discord)
         self.discord_button.setToolTip("Open Discord server in web browser")
 
+        Date = DATE
+        Iteration = ITERATION
+        Version = VERSION
+
         # Modpack Manager Info
-        self.info = QLabel("Build: 2024/08/27, Iteration: 17, Version: Release 1.2.3", self)
+        self.info = QLabel(f"Build: {Date}, Iteration: {Iteration}, Version: Release {Version}", self)
         self.info.setStyleSheet("font: 8pt 'Helvetica';")
         layout.addWidget(self.info, 10, 0, 1, 6, alignment=Qt.AlignmentFlag.AlignRight)
 
@@ -559,11 +567,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.version_hash_label.setStyleSheet("color: gray;")
         layout.addWidget(self.version_hash_label, 4, 0, 1, 2)
 
-        # Reset Button to Revert to Commit
+        # Button to Revert to Current
+        self.current_button = QPushButton("Revert to Current", popup)
+        self.current_button.clicked.connect(self.switch_back_to_main)
+        layout.addWidget(self.current_button, 5, 0, 1, 1)
+        
+        # Button to Revert to Commit
         self.time_travel_button = QPushButton("Time Travel", popup)
         self.time_travel_button.setEnabled(False)  # Initially disabled
         self.time_travel_button.clicked.connect(self.revert_version)
-        layout.addWidget(self.time_travel_button, 5, 0, 1, 2)
+        layout.addWidget(self.time_travel_button, 5, 1, 1, 1)
 
         # Close event handler to reset the flag when the window is closed
         def revert_on_close():
@@ -687,10 +700,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         old_version = self.version_var.currentText()
 
         # Get the correct commit hash from the version_hash_label
-        commit_hash = self.version_hash_label.cget("text")
+        commit_hash = self.version_hash_label.text()
 
         try:
             repo = git.Repo(repo_path)
+
+            # Perform git switch --detach to detach HEAD
+            repo.git.switch('--detach')
+
             # Perform the git reset --hard <hash>
             repo.git.reset('--hard', commit_hash)
 
@@ -707,6 +724,31 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.setIcon(QMessageBox.Icon.Critical)
             msg_box.setWindowTitle("Error")
             msg_box.setText(f"Failed to time travel: {str(e)}")
+            msg_box.exec()
+
+    def switch_back_to_main(self):
+        modpack_name = self.modpack_var.currentText()
+        repo_path = os.path.join(os.getcwd(), modpack_name)
+
+        try:
+            repo = git.Repo(repo_path)
+            
+            # Perform git switch main to switch back to the main branch
+            repo.git.switch('main')
+
+            # Show success message
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("Success")
+            msg_box.setText("Travelled back to current.")
+            msg_box.exec()
+
+        except Exception as e:
+            # Show error message
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setWindowTitle("Error")
+            msg_box.setText(f"Failed to travel back to current: {str(e)}")
             msg_box.exec()
 
 ############################################################
@@ -987,7 +1029,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             "Fine-tuned": ("Dimserene", "Fine-tuned-Pack"),
             "Vanilla+": ("Dimserene", "Vanilla-Plus-Pack"),
             "Insane Pack": ("Dimserene", "Insane-Pack"),
-            "Cruel Pack": ("Dimserene", "Cruel-Pack")
+            "Cruel Pack": ("Dimserene", "Cruel-Pack"),
+            "Manager": ("Dimserene", "ModpackManager")
         }
         commit_messages = {}
         for repo_name, (owner, name) in repos.items():
