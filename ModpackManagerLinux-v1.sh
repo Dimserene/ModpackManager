@@ -16,11 +16,15 @@ LOVELY_TEMP_DIR="$HOME/Downloads/LovelyInjectorTemp"
 DIMSERENE_MODPACK_URL="https://github.com/Dimserene/Dimserenes-Modpack"
 FINE_TUNED_MODPACK_URL="https://github.com/Dimserene/Fine-tuned-Pack"
 VANILLA_PLUS_MODPACK_URL="https://github.com/Dimserene/Vanilla-Plus-Pack"
+INSANE_MODPACK_URL="https://github.com/Dimserene/Insane-Pack"
+CRUEL_MODPACK_URL="https://github.com/Dimserene/Cruel-Pack"
 
 REPO_NAME=""
-DIMSERENE_MODPACK_NAME="Full(Extreme)"
+DIMSERENE_MODPACK_NAME="Full"
 FINE_TUNED_MODPACK_NAME="Fine-tuned"
 VANILLA_PLUS_MODPACK_NAME="Vanilla+"
+INSANE_MODPACK_NAME="Insane"
+CRUEL_MODPACK_NAME="Cruel"
 
 # Function to display menu options
 display_menu() {
