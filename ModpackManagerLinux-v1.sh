@@ -220,6 +220,8 @@ choose_modpack() {
   echo "1. Dimserene's Modpack"
   echo "2. Fine-tuned Pack"
   echo "3. Vanilla+ Pack"
+  echo "4. Insane Pack"
+  echo "5. Cruel Pack"
   echo ""
   read -r MODPACK_CHOICE
   case $MODPACK_CHOICE in
@@ -240,6 +242,18 @@ choose_modpack() {
       MODPACK_NAME=$VANILLA_PLUS_MODPACK_NAME
       MODPACK_URL=$VANILLA_PLUS_MODPACK_URL
       REPO_NAME="Vanilla-Plus-Pack"
+      ;;
+    4)
+      echo "You chose Insane Pack."
+      MODPACK_NAME=$INSANE_MODPACK_NAME
+      MODPACK_URL=$INSANE_MODPACK_URL
+      REPO_NAME="Insane-Pack"
+      ;;
+    5)
+      echo "You chose Cruel Pack."
+      MODPACK_NAME=$CRUEL_MODPACK_NAME
+      MODPACK_URL=$CRUEL_MODPACK_URL
+      REPO_NAME="Cruel-Pack"
       ;;
     *)
       echo "Invalid choice. Please select a valid modpack."
