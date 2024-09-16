@@ -1190,32 +1190,44 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.game_dir = self.settings.get("game_directory")
         self.profile_name = self.settings.get("profile_name")        
 
-        # Debugging: Print the settings loaded
-        print(f"Game Directory: {self.game_dir}")
-        print(f"Profile Name: {self.profile_name}")
+        # Detect the operating system
+        system_platform = platform.system()
 
-        # Construct the path to the game executable
-        game_executable = os.path.join(self.game_dir, f"{self.profile_name}.exe")
+        if system_platform == "Windows":
+            # Construct the path to the game executable
+            game_executable = os.path.join(self.game_dir, f"{self.profile_name}.exe")
 
-        # Debugging: Print the constructed path to ensure it's correct
-        print(f"Game Executable Path: {game_executable}")
+            try:
+                # Check if the executable exists
+                if os.path.exists(game_executable):
+                    print(f"Launching {game_executable}")
+                    # Use QProcess to launch the game in a non-blocking way
+                    self.process = QProcess(self)
+                    self.process.start(game_executable)
+                else:
+                    raise FileNotFoundError(f"Game executable not found: {game_executable}")
+            except Exception as e:
+                # Display an error message if something goes wrong
+                msg_box = QMessageBox()
+                msg_box.setIcon(QMessageBox.Icon.Critical)
+                msg_box.setWindowTitle("Error")
+                msg_box.setText(f"Failed to launch game: {e}")
+                msg_box.exec()
 
-        try:
-            # Check if the executable exists
-            if os.path.exists(game_executable):
-                print(f"Launching {game_executable}")
-                # Use QProcess to launch the game in a non-blocking way
+        elif system_platform == "Linux":
+            try:
+                # Use Steam to launch the game via its app ID
+                steam_command = "steam://rungameid/2379780"
+                print(f"Launching game via Steam: {steam_command}")
                 self.process = QProcess(self)
-                self.process.start(game_executable)
-            else:
-                raise FileNotFoundError(f"Game executable not found: {game_executable}")
-        except Exception as e:
-            # Display an error message if something goes wrong
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"Failed to launch game: {e}")
-            msg_box.exec()
+                self.process.start("xdg-open", [steam_command])  # xdg-open is used to open URLs on Linux
+            except Exception as e:
+                # Display an error message if something goes wrong
+                msg_box = QMessageBox()
+                msg_box.setIcon(QMessageBox.Icon.Critical)
+                msg_box.setWindowTitle("Error")
+                msg_box.setText(f"Failed to launch game via Steam: {e}")
+                msg_box.exec()
 
 
     def get_latest_commit_message(self, repo_owner, repo_name):
