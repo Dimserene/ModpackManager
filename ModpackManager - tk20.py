@@ -52,7 +52,7 @@ class ModpackDownloadWorker(QThread):
         try:
             # Remove existing directory if force update is true
             if os.path.isdir(self.repo_name) and self.force_update:
-                shutil.rmtree(self.repo_name, onexc=readonly_handler)
+                shutil.rmtree(self.repo_name, onerror=readonly_handler)
 
             # Set up the QProcess to run the git command
             self.process = QProcess()
@@ -1758,7 +1758,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                     return
 
             # Remove the existing Mods folder
-            shutil.rmtree(self.mods_dir, ignore_errors=True, onexc=readonly_handler)
+            shutil.rmtree(self.mods_dir, ignore_errors=True, onerror=readonly_handler)
 
         # Ensure the install directory exists
         if not os.path.exists(self.mods_dir):
@@ -1773,7 +1773,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 # Copy the mod folder to the installation directory
                 try:
                     if os.path.exists(destination_mod_path):
-                        shutil.rmtree(destination_mod_path, onexc=readonly_handler)  # Remove old version of the mod if it exists
+                        shutil.rmtree(destination_mod_path, onerror=readonly_handler)  # Remove old version of the mod if it exists
                     shutil.copytree(source_mod_path, destination_mod_path)
                 except Exception as e:
                     msg_box = QMessageBox()
@@ -1993,7 +1993,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 # Misc functions
 ############################################################
 
-def readonly_handler(func, path, execinfo):
+def readonly_handler(func, path, exc_info):
+    # Remove read-only attribute and retry
     os.chmod(path, stat.S_IWRITE)
     func(path)
 
