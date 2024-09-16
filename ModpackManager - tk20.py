@@ -2029,6 +2029,19 @@ if __name__ == "__main__":
 
     # Set global stylesheet to apply a 1pt gray border to all QPushButtons
     app.setStyleSheet("""
+        QWidget {
+            background-color: #f3f3f3;  /* Set background color */
+            color: #000000;  /* Set text color */
+        }
+                      
+        QMainWindow, QDialog, QWidget {
+            background-color: #f3f3f3;  /* Force window background to white */
+        }
+                      
+        QLabel, QLineEdit, QPushButton, QComboBox, QCheckBox, QSpinBox {
+            color: #000000;  /* Force text color to black */
+        }
+                      
         QPushButton {
             border: 1px solid gray;
             border-radius: 5px;
@@ -2038,30 +2051,40 @@ if __name__ == "__main__":
             padding-right: 10px; /* Equivalent to ipadx */
             background-color: #f3f3f3;  /* Default background color */
         }
+                      
         QPushButton:hover {
             background-color: #dadada;  /* Hover color */
         }
+                      
         QPushButton:pressed {
             background-color: #aaaaaa;  /* Press color */
         }
+                      
         QPushButton:disabled {
             background-color: #e0e0e0;  /* Disabled background color */
             color: #a0a0a0;  /* Disabled text color */
             border: 1px solid #cccccc;  /* Disabled border color */
         }
+                      
         QSpinBox {
             padding: 10px;  /* Set padding for spinbox */
+            border: 1px solid gray;  /* Dropdown border */
         }
+                      
         QComboBox {
             padding: 10px 10px;  /* Padding inside the dropdown */
             background-color: #f3f3f3;  /* Default background color */
+            border: 1px solid gray;  /* Dropdown border */
         }
+                      
         QComboBox QLineEdit {
             padding: 20px;  /* Padding inside the editable field */
             background-color: #f3f3f3;  /* Background color for editable field */
             border: none;  /* Remove the border for the internal QLineEdit */
         }
+                      
         QLineEdit {
+            background-color: #f3f3f3;  /* Background for input fields */
             border: 1px solid gray;
             border-radius: 5px;
             padding-left: 10px;
@@ -2069,6 +2092,26 @@ if __name__ == "__main__":
             padding-top: 10px;
             padding-bottom: 10px;
         }
+                      
+        QCheckBox {
+            background-color: transparent;  /* Transparent background for checkboxes */
+        }
+                      
+        QCheckBox::indicator {
+            width: 15px;  /* Size of the checkbox */
+            height: 15px;  /* Size of the checkbox */
+            border: 2px solid black;  /* Black outline for checkbox */
+            background-color: #ffffff;  /* White background for checkbox */
+        }
+                      
+        QCheckBox::indicator:checked {
+            background-color: #000000;  /* Black background when checked */
+        }
+                      
+        QProgressDialog {
+            background-color: #ffffff;  /* Background color for progress dialogs */
+        }
+                      
     """)
 
     # Center the window
