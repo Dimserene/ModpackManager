@@ -1872,12 +1872,24 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # List of locked mods that cannot be deselected
         locked_mods = ["ModpackUtil", "Steamodded"]
 
+        # Define mod dependencies: {'mod_that_depends': ['required_mod1', 'required_mod2', ...]}
+        dependencies = {
+            "Cryptid": ["Talisman"],
+            "JokerDisplayModSupport": ["JokerDisplay"],
+            "ModpackDecks": ["SDM_0-s-Stuff", "JankJonklers"],
+            "Jestobiology": ["Fusion-Jokers"],
+            "JensAlmanac": ["Aurinko", "Cryptid", "Fusion-Jokers", "Incantation", "JenLib", "Talisman"]
+            # Add more dependencies as needed
+        }
+
+        # Exclude "ModpackUtil" and "Steamodded" from mod selection
+        filtered_mod_list = [mod for mod in mod_list if mod not in locked_mods]
+
         # Create a list of checkboxes for each mod
         mod_vars = []
         mods_per_column = 15  # Number of mods per column
-        num_columns = (len(mod_list) + mods_per_column - 1) // mods_per_column  # Calculate number of columns needed
 
-        for index, mod in enumerate(mod_list):
+        for index, mod in enumerate(filtered_mod_list):
             var = QCheckBox(mod, popup)
             var.setChecked(mod in self.excluded_mods)
             mod_vars.append((mod, var))
@@ -1886,9 +1898,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             row = (index % mods_per_column) + 1  # Row position
             column = index // mods_per_column  # Column position
 
-            # Disable checkbox if the mod is locked
-            if mod in locked_mods:
-                var.setDisabled(True)
+            # Connect the checkbox state change event to handle dependencies
+            var.stateChanged.connect(lambda state, mod=mod, var=var: self.handle_dependencies(mod, var, mod_vars, dependencies))
 
             # Add the checkbox to the layout
             layout.addWidget(var, row, column)
@@ -1896,14 +1907,12 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Function to clear all selections
         def clear_all():
             for mod, var in mod_vars:
-                if mod not in locked_mods:  # Only clear mods that are not locked
-                    var.setChecked(False)
+                var.setChecked(False)
 
         # Function to reverse the selections
         def reverse_select():
             for mod, var in mod_vars:
-                if mod not in locked_mods:  # Only reverse mods that are not locked
-                    var.setChecked(not var.isChecked())
+                var.setChecked(not var.isChecked())
 
         # Create the buttons
         clear_button = QPushButton("Clear All", popup)
@@ -1953,6 +1962,27 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Show the dialog as modal
         popup.exec()
+
+    def handle_dependencies(self, mod, var, mod_vars, dependencies):
+        """Handle mod dependencies when a checkbox is clicked (checked = excluded)."""
+        
+        # Case 1: If a required mod (A) is excluded, ensure all dependent mods (B) are excluded
+        if var.isChecked():
+            for dependent_mod, required_mods in dependencies.items():
+                if mod in required_mods:  # If the current mod is a required mod for any dependent mod
+                    for mod_name, mod_var in mod_vars:
+                        if mod_name == dependent_mod and not mod_var.isChecked():
+                            # Exclude the dependent mod if the required mod is excluded
+                            mod_var.setChecked(True)
+
+        # Case 2: If a dependent mod (B) is unexcluded (unchecked), unexclude the required mod (A)
+        if not var.isChecked() and mod in dependencies:
+            required_mods = dependencies[mod]
+            for required_mod in required_mods:
+                for mod_name, mod_var in mod_vars:
+                    if mod_name == required_mod and mod_var.isChecked():
+                        # Unexclude the required mod if the dependent mod is unexcluded
+                        mod_var.setChecked(False)
 
     def save_preferences(self, mod_vars):
         # Let the user pick mods they DON'T want to install
@@ -2116,8 +2146,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             mods_path = os.path.join(install_path, 'ModpackUtil')
 
             current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
-            current_pack_file = os.path.join(mods_path, 'CurrentPack.txt')
             modpack_util_file = os.path.join(mods_path, 'ModpackUtil.lua')
+            current_pack_file = os.path.join(mods_path, 'CurrentPack.txt')  # For Coonie's modpack
 
             current_version = None
             if os.path.exists(current_version_file):
@@ -2127,16 +2157,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 except IOError as e:
                     print(f"IOError reading CurrentVersion.txt: {e}")
 
-            # Check if CurrentPack.txt exists and use it to determine the pack name
-            pack_name = None
+            pack_name = ""
+            # Check if CurrentPack.txt exists for Coonie's modpack
             if os.path.exists(current_pack_file):
                 try:
                     with open(current_pack_file, 'r') as file:
                         pack_name = file.read().strip()
                 except IOError as e:
                     print(f"IOError reading CurrentPack.txt: {e}")
-
-            if os.path.exists(modpack_util_file):
+            elif os.path.exists(modpack_util_file):
+                # Check ModpackUtil.lua for version information
                 try:
                     with open(modpack_util_file, 'r') as file:
                         for line in file:
@@ -2148,52 +2178,29 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             else:
                 pack_name = None
 
-            # Fetch commit messages for other modpacks
             commit_messages = self.fetch_commit_messages()
 
             version_info = ""
+            coonies_version_info = self.get_latest_coonies_tag()
+            installed_info = ""
             update_message = ""
 
             for repo_name, commit_message in commit_messages.items():
-                version_info += f"{repo_name}:\t{commit_message}\n\n"
+                version_info += f"{repo_name}:\t{commit_message}\n"
 
-                # Fetch the latest tag name from Coonie's Modpack GitHub repository
-                latest_tag = self.get_latest_coonies_tag()
-
-                # Display Coonie's Modpack version info
-                if latest_tag:
-                    version_info += f"Coonie's Modpack:\tLatest version: {latest_tag}\n"
-                else:
-                    version_info += f"Coonie's Modpack:\tUnable to fetch latest version.\n"
-
-            if pack_name == repo_name:
-                if current_version and commit_message != current_version:
-                    update_message = "Update available!"
-                    
-            if pack_name == "Coonie's Modpack":
-                # Fetch the latest tag name from Coonie's Modpack GitHub repository
-                current_version = latest_tag
-                latest_tag = self.get_latest_coonies_tag()
-
-                if current_version and latest_tag != current_version:
-                    update_message = f"Update available!"
-                else:
-                    update_message = ""
-
+                if pack_name == repo_name:
+                    if current_version and commit_message != current_version:
+                        update_message = "Update available!"
+            
             if pack_name:
-                version_info = f"\nInstalled modpack: {pack_name}\nInstalled version: {current_version}"
+                installed_info = f"\nInstalled modpack: {pack_name}\nInstalled version: {current_version}"
             else:
-                version_info = "\nNo modpack installed or ModpackUtil mod removed."
+                installed_info = "\nNo modpack installed or ModpackUtil mod removed."
 
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Information)
             msg_box.setWindowTitle("Version Information")
-
-            if update_message:
-                msg_box.setText(f"{version_info}\n\n{update_message}")
-            else:
-                msg_box.setText(version_info)
-
+            msg_box.setText(f"{version_info}\nCoonie's:\t{coonies_version_info}\n{installed_info}\n\n{update_message}")
             msg_box.exec()
 
         except Exception as e:
@@ -2202,6 +2209,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.setWindowTitle("Error")
             msg_box.setText(f"An error occurred while checking versions: {str(e)}")
             msg_box.exec()
+
 
     def get_latest_coonies_tag(self):
         """Fetch the latest tag name from the Coonie's Modpack GitHub repository."""
