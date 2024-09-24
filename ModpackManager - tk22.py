@@ -1,9 +1,10 @@
-import os, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform
+import os, sys, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform, subprocess
 from datetime import datetime
-from git import GitCommandError, Repo
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer, QProcess, QThread, pyqtSignal, QPoint
 from PyQt6.QtWidgets import QFrame, QProgressDialog, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
+from git import Repo, GitCommandError
+os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
 
 ############################################################
 # Detect OS and set default settings
@@ -272,6 +273,15 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Call the default closeEvent to continue closing the window
         super(ModpackManagerApp, self).closeEvent(event)
+
+    def show_git_error(self, message):
+        """Display a user-friendly error message if Git is not installed."""
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Icon.Critical)
+        msg_box.setWindowTitle("Git Not Found")
+        msg_box.setText(f"{message}\n\nPlease install Git and Reboot your device.\n\n"
+                        "Visit https://git-scm.com/downloads for installation instructions.")
+        msg_box.exec()
 
 ############################################################
 # Foundation of root window
