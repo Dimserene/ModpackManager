@@ -1,4 +1,4 @@
-import os, sys, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform, subprocess
+import os, random, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform
 from datetime import datetime
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer, QProcess, QThread, pyqtSignal, QPoint
@@ -35,7 +35,7 @@ INSTALL_FILE = "excluded_mods.json"
 
 DATE = "2024/09/29"
 ITERATION = "22"
-VERSION = "1.4.3"
+VERSION = "1.4.4"
 
 ############################################################
 # Worker class for downloading/updating modpack in the background
@@ -273,15 +273,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Call the default closeEvent to continue closing the window
         super(ModpackManagerApp, self).closeEvent(event)
-
-    def show_git_error(self, message):
-        """Display a user-friendly error message if Git is not installed."""
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Icon.Critical)
-        msg_box.setWindowTitle("Git Not Found")
-        msg_box.setText(f"{message}\n\nPlease install Git and Reboot your device.\n\n"
-                        "Visit https://git-scm.com/downloads for installation instructions.")
-        msg_box.exec()
 
 ############################################################
 # Foundation of root window
@@ -1918,12 +1909,27 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 var.setChecked(not var.isChecked())
                 var.blockSignals(False)  # Re-enable signals after changing the state
 
+        # Function to randomly select mods and apply dependencies
+        def feel_lucky():
+            for _, var in mod_vars:
+                var.blockSignals(True)  # Temporarily block signals to avoid triggering stateChanged handlers
+                var.setChecked(random.choice([True, False]))  # Randomly check/uncheck the mod
+                var.blockSignals(False)  # Re-enable signals after changing the state
+            
+            # Ensure dependencies are respected after random selection
+            for mod, var in mod_vars:
+                if var.isChecked():
+                    self.handle_dependencies(mod, var, mod_vars, dependencies)
+
         # Create the buttons
         clear_button = QPushButton("Clear All", popup)
         clear_button.clicked.connect(clear_all)
 
         reverse_button = QPushButton("Reverse Select", popup)
         reverse_button.clicked.connect(reverse_select)
+
+        feel_lucky_button = QPushButton("I Feel Lucky", popup)
+        feel_lucky_button.clicked.connect(feel_lucky)
 
         save_button = QPushButton("Save && Install", popup)
         save_button.clicked.connect(lambda: self.save_and_install(mod_vars, popup))
@@ -1935,6 +1941,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Add buttons to the container's layout
         button_layout.addWidget(clear_button)
         button_layout.addWidget(reverse_button)
+        button_layout.addWidget(feel_lucky_button)  # Add "I Feel Lucky" button
         button_layout.addWidget(save_button)
 
         # Align the buttons to the center of the row
