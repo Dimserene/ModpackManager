@@ -348,7 +348,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             "Fine-tuned Pack",
             "Vanilla+ Pack",
             "Insane Pack",
-            "Cruel Pack"
+            "Cruel Pack",
+            "Taquin Paquet"
         ])
 
         # Set the default modpack based on settings
@@ -1452,7 +1453,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             "Fine-tuned Pack": "https://github.com/Dimserene/Fine-tuned-Pack.git",
             "Vanilla+ Pack": "https://github.com/Dimserene/Vanilla-Plus-Pack.git",
             "Insane Pack": "https://github.com/Dimserene/Insane-Pack.git",
-            "Cruel Pack": "https://github.com/Dimserene/Cruel-Pack.git"
+            "Cruel Pack": "https://github.com/Dimserene/Cruel-Pack.git",
+            "Taquin Paquet": "https://github.com/Dimserene/Taquin-Paquet.git",
         }
         return urls.get(modpack_name, "")
 
