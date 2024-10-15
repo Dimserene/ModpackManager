@@ -1833,7 +1833,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def get_mod_list(self, mods_src):
         try:
-            return [f for f in os.listdir(mods_src) if os.path.isdir(os.path.join(mods_src, f))]
+            return sorted([f for f in os.listdir(mods_src) if os.path.isdir(os.path.join(mods_src, f))], key=lambda s: s.lower())
         except FileNotFoundError:
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Critical)
