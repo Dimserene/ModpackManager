@@ -2554,4 +2554,3 @@ if __name__ == "__main__":
 
     root.show()  # Show the main window
     app.exec()   # Execute the application's event loop
-
