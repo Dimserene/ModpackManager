@@ -33,9 +33,9 @@ elif system_platform == "Linux":
 SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 
-DATE = "2024/09/29"
+DATE = "2024/10/19"
 ITERATION = "22"
-VERSION = "1.4.4"
+VERSION = "1.4.5"
 
 ############################################################
 # Worker class for downloading/updating modpack in the background
