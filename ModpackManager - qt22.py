@@ -387,14 +387,21 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Time Travel button
         self.revert_button = QPushButton("Time Travel", self)
         self.revert_button.setStyleSheet("font: 12pt 'Helvetica';")
-        layout.addWidget(self.revert_button, 7, 0, 1, 3)
+        layout.addWidget(self.revert_button, 7, 0, 1, 2)
         self.revert_button.clicked.connect(self.open_revert_popup)
         self.revert_button.setToolTip("Revert the modpack to a certain historical version")
+
+        # Verify Integrity button
+        self.verify_button = QPushButton("Verify Integrity", self)
+        self.verify_button.setStyleSheet("font: 12pt 'Helvetica';")
+        layout.addWidget(self.verify_button, 7, 2, 1, 2)  # Adjust grid position as needed
+        self.verify_button.clicked.connect(self.verify_modpack_integrity)
+        self.verify_button.setToolTip("Check modpack for missing or incomplete files")
 
         # Auto backup button
         self.backup_button = QPushButton("Backup Save", self)
         self.backup_button.setStyleSheet("font: 12pt 'Helvetica';")
-        layout.addWidget(self.backup_button, 7, 3, 1, 3)
+        layout.addWidget(self.backup_button, 7, 4, 1, 2)
         self.backup_button.clicked.connect(self.auto_backup_popup)
         self.backup_button.setToolTip("Automatically backup saves in set duration")
 
@@ -1833,7 +1840,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def get_mod_list(self, mods_src):
         try:
-            return [f for f in os.listdir(mods_src) if os.path.isdir(os.path.join(mods_src, f))]
+            return sorted([f for f in os.listdir(mods_src) if os.path.isdir(os.path.join(mods_src, f))], key=lambda s: s.lower())
         except FileNotFoundError:
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Critical)
@@ -2190,6 +2197,72 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 # Bottom functions (Check versions, lovely, browser links)
 ############################################################
 
+    # Function to check if a folder is empty or contains only a '.git' directory
+    def is_empty_or_git_only(self, folder_path):
+        try:
+            # Get list of files/folders in the current directory, excluding hidden files
+            items = [item for item in os.listdir(folder_path) if not item.startswith('.')]
+            if len(items) == 0:
+                return True  # Folder is empty
+            if len(items) == 1 and items[0] == '.git':
+                return True  # Folder contains only .git
+            return False
+        except Exception as e:
+            print(f"Error while processing {folder_path}: {str(e)}")
+            return False
+
+    # Function to list all empty or git-only folders
+    def list_empty_or_git_only_folders(self, root_folder):
+        empty_or_git_only_folders = []
+        for dirpath, dirnames, filenames in os.walk(root_folder):
+            if self.is_empty_or_git_only(dirpath):
+                empty_or_git_only_folders.append(os.path.basename(dirpath))  # Append folder name, not full path
+        return empty_or_git_only_folders
+
+    # Verification function for a specific modpack folder
+    def verify_modpack_folder(self, modpack_folder):
+        print(f"Verifying modpack folder: {modpack_folder}")
+        self.list_empty_or_git_only_folders(modpack_folder)
+
+    # Function to verify the integrity of the 'Mods' folder of the currently selected modpack
+    def verify_modpack_integrity(self):
+        modpack_name = self.modpack_var.currentText()  # Get the name of the selected modpack
+
+        # Handle special case for Coonie's Modpack
+        if modpack_name == "Coonie's Modpack":
+            repo_name = "Coonies-Modpack"
+        else:
+            clone_url = self.get_modpack_url(modpack_name)
+            repo_name = clone_url.split('/')[-1].replace('.git', '')
+
+        modpack_folder = os.path.join(os.getcwd(), repo_name, 'Mods')  # Check inside the 'Mods' folder
+
+        if not os.path.isdir(modpack_folder):
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("Mods Folder Not Found")
+            msg_box.setText(f"The 'Mods' folder for {modpack_name} is not found.")
+            msg_box.exec()
+            return
+
+        # Call the verification function to get the list of empty or .git-only folders
+        empty_or_git_only_folders = self.list_empty_or_git_only_folders(modpack_folder)
+
+        # Show the result in a message box
+        if empty_or_git_only_folders:
+            folder_list = "\n".join(empty_or_git_only_folders)
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("Verification Result")
+            msg_box.setText(f"The following mods are not downloaded correctly:\n\n{folder_list}")
+            msg_box.exec()
+        else:
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Information)
+            msg_box.setWindowTitle("Verification Complete")
+            msg_box.setText(f"All folders in the 'Mods' folder for {modpack_name} are properly populated.")
+            msg_box.exec()
+
     def check_versions(self):
         try:
             install_path = self.mods_dir
@@ -2481,5 +2554,4 @@ if __name__ == "__main__":
 
     root.show()  # Show the main window
     app.exec()   # Execute the application's event loop
-
 
