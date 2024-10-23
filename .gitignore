@@ -7,4 +7,5 @@
 /dist/Coonies-ModPack/
 /dist/Taquin-Paquet/
 *.spec
-*.json
+excluded_mods.json
+user_settings.json
