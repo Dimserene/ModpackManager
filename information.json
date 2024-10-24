@@ -1,38 +1,38 @@
 {
-  "latest_version": "1.5.0",
+  "latest_version": "1.5.1",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "Bug fixes and performance improvements.",
+  "changelog": "Bug fixes.",
   "modpack_categories": [
     {
       "category": "Dimserene",
       "modpacks": [
         {
-          "name": "Dimserene's Modpack",
+          "name": "Dimserenes-Modpack",
           "url": "https://github.com/Dimserene/Dimserenes-Modpack.git",
-          "description": "A full-featured modpack including various quality of life improvements."
+          "description": "A full-featured modpack including as many mods as possible."
         },
         {
-          "name": "Fine-tuned Pack",
+          "name": "Fine-tuned-Pack",
           "url": "https://github.com/Dimserene/Fine-tuned-Pack.git",
           "description": "A carefully crafted modpack for an optimized gameplay experience."
         },
         {
-          "name": "Vanilla+ Pack",
+          "name": "Vanilla-Plus-Pack",
           "url": "https://github.com/Dimserene/Vanilla-Plus-Pack.git",
           "description": "Enhances the core game with small improvements while staying true to the original experience."
         },
         {
-          "name": "Insane Pack",
+          "name": "Insane-Pack",
           "url": "https://github.com/Dimserene/Insane-Pack.git",
           "description": "A collection of broken and extremely overpowered mods."
         },
         {
-          "name": "Cruel Pack",
+          "name": "Cruel-Pack",
           "url": "https://github.com/Dimserene/Cruel-Pack.git",
           "description": "A harsh and unforgiving modpack for experienced players."
         },
         {
-          "name": "Taquin Paquet",
+          "name": "Taquin-Paquet",
           "url": "https://github.com/Dimserene/Taquin-Paquet.git",
           "description": "A meme modpack designed for fun and laughter."
         }
@@ -42,9 +42,9 @@
       "category": "GayCoonie",
       "modpacks": [
         {
-          "name": "Coonie's Modpack",
+          "name": "Coonies-Modpack",
           "url": "https://github.com/GayCoonie/Coonies-Mod-Pack/releases/latest/download/Mods.zip",
-          "description": "A quirky and fun collection of mods by Coonie, adding new twists to the game."
+          "description": "A fun collection of mods picked by Coonie, adding new twists to the game."
         }
       ]
     },
@@ -52,9 +52,9 @@
       "category": "Elbe",
       "modpacks": [
         {
-          "name": "Elbe's Modpack",
+          "name": "elbes-Modpack",
           "url": "https://github.com/lshtech/elbes-Modpack.git",
-          "description": "A modpack that includes everything, but it's probably unstable."
+          "description": "A modpack crafted by Elbe that includes everything, but it's probably unstable."
         }
       ]
     }
