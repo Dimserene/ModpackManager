@@ -63,6 +63,13 @@ def fetch_modpack_data(url):
 
 modpack_data = fetch_modpack_data(url)
 
+from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtCore import QProcess
+import os
+import shutil
+import requests
+import zipfile
+
 class ModpackDownloadWorker(QThread):
     finished = pyqtSignal(bool, str)
 
@@ -75,31 +82,76 @@ class ModpackDownloadWorker(QThread):
 
     def run(self):
         try:
+            # Check if the repository folder already exists
+            if os.path.exists(self.repo_name):
+                if self.force_update:
+                    # Delete the existing folder if force_update is True
+                    try:
+                        shutil.rmtree(self.repo_name, onerror=readonly_handler)
+                        print(f"Deleted existing folder: {self.repo_name}")
+                    except Exception as e:
+                        self.finished.emit(False, f"Failed to delete existing folder: {str(e)}")
+                        return
+                else:
+                    # If not forcing update, emit failure message
+                    self.finished.emit(False, f"Modpack folder '{self.repo_name}' already exists. Enable force update to overwrite.")
+                    return
+
             if self.clone_url.endswith('.git'):
-                # Clone the repository
+                # Clone the repository using Git
                 self.process = QProcess()
-                git_command = ["git", "clone", "--recurse-submodules", self.clone_url, self.repo_name]
+                git_command = ["git", "clone", "--recurse-submodules", "--remote-submodules", self.clone_url, self.repo_name]
                 self.process.start(git_command[0], git_command[1:])
                 self.process.waitForFinished(-1)
+
+                # Check if Git process finished without errors
+                if self.process.exitCode() != 0 or self.process.error():
+                    error_msg = self.process.readAllStandardError().data().decode('utf-8')
+                    self.finished.emit(False, f"Git clone failed: {error_msg}")
+                    return
+
+                # Verify that the repository was successfully cloned
+                if not os.path.exists(self.repo_name) or not os.listdir(self.repo_name):
+                    self.finished.emit(False, f"Git clone failed: No files found in {self.repo_name}.")
+                    return
+
             else:
                 # Download the file
                 response = requests.get(self.clone_url, stream=True)
+                if response.status_code != 200:
+                    self.finished.emit(False, f"File download failed: HTTP status {response.status_code}.")
+                    return
+
                 total_size = int(response.headers.get('content-length', 0))
                 downloaded_size = 0
                 local_file_path = os.path.join(os.getcwd(), self.repo_name + '.zip')
+
                 with open(local_file_path, 'wb') as f:
                     for chunk in response.iter_content(chunk_size=1024):
                         if chunk:
                             f.write(chunk)
                             downloaded_size += len(chunk)
+
+                # Verify the file size after download
+                if downloaded_size != total_size:
+                    self.finished.emit(False, "File download failed: Incomplete file.")
+                    return
+
                 # Unzip if necessary
                 if zipfile.is_zipfile(local_file_path):
-                    with zipfile.ZipFile(local_file_path, 'r') as zip_ref:
-                        zip_ref.extractall(self.repo_name)
-                    os.remove(local_file_path)
+                    try:
+                        with zipfile.ZipFile(local_file_path, 'r') as zip_ref:
+                            zip_ref.extractall(self.repo_name)
+                        os.remove(local_file_path)
+                    except zipfile.BadZipFile:
+                        self.finished.emit(False, "File download failed: Corrupt ZIP file.")
+                        return
+
             self.finished.emit(True, f"Successfully downloaded {self.repo_name}.")
+
         except Exception as e:
             self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
+
 
 
 class ModpackUpdateWorker(QThread):
