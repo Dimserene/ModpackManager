@@ -41,9 +41,9 @@ elif system_platform == "Linux":
 SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 
-DATE = "2024/10/25"
+DATE = "2024/10/27"
 ITERATION = "24"
-VERSION = "1.5.1"
+VERSION = "1.5.2"
 
 ############################################################
 # Worker class for downloading/updating modpack in the background
@@ -65,6 +65,7 @@ modpack_data = fetch_modpack_data(url)
 
 class ModpackDownloadWorker(QThread):
     finished = pyqtSignal(bool, str)
+    progress = pyqtSignal(int)  # Signal to update progress (optional)
 
     def __init__(self, clone_url, repo_name, force_update=False):
         super().__init__()
@@ -93,23 +94,15 @@ class ModpackDownloadWorker(QThread):
             if self.clone_url.endswith('.git'):
                 # Clone the repository using Git
                 self.process = QProcess()
+                self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)  # Merge stdout and stderr
                 git_command = ["git", "clone", "--recurse-submodules", "--remote-submodules", self.clone_url, self.repo_name]
+                
+                # Connect QProcess signals for dynamic error capturing
+                self.process.finished.connect(self.git_finished)
                 self.process.start(git_command[0], git_command[1:])
                 self.process.waitForFinished(-1)
-
-                # Check if Git process finished without errors
-                if self.process.exitCode() != 0 or self.process.error():
-                    error_msg = self.process.readAllStandardError().data().decode('utf-8')
-                    self.finished.emit(False, f"Git clone failed: {error_msg}")
-                    return
-
-                # Verify that the repository was successfully cloned
-                if not os.path.exists(self.repo_name) or not os.listdir(self.repo_name):
-                    self.finished.emit(False, f"Git clone failed: No files found in {self.repo_name}.")
-                    return
-
             else:
-                # Download the file
+                # Download the file (this part will still emit the success message)
                 response = requests.get(self.clone_url, stream=True)
                 if response.status_code != 200:
                     self.finished.emit(False, f"File download failed: HTTP status {response.status_code}.")
@@ -124,6 +117,10 @@ class ModpackDownloadWorker(QThread):
                         if chunk:
                             f.write(chunk)
                             downloaded_size += len(chunk)
+                            # Emit progress signal if you have a connected GUI progress bar
+                            if total_size > 0:
+                                progress_percent = int((downloaded_size / total_size) * 100)
+                                self.progress.emit(progress_percent)
 
                 # Verify the file size after download
                 if downloaded_size != total_size:
@@ -140,13 +137,45 @@ class ModpackDownloadWorker(QThread):
                         self.finished.emit(False, "File download failed: Corrupt ZIP file.")
                         return
 
-            self.finished.emit(True, f"Successfully downloaded {self.repo_name}.")
+                # If file download succeeds, emit success
+                self.finished.emit(True, f"Successfully downloaded {self.repo_name}.")
 
         except Exception as e:
             self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
 
+    def git_finished(self):
+        """Callback for handling the QProcess finish signal for Git operations."""
+        # Capture standard output and error messages
+        output = self.process.readAllStandardOutput().data().decode('utf-8').strip()
+        error_msg = self.process.readAllStandardError().data().decode('utf-8').strip()
+
+        # Check for actual error conditions
+        if self.process.exitCode() == 0 and self.process.error() == QProcess.ProcessError.UnknownError:
+            # Success case: Repository should exist
+            if os.path.exists(self.repo_name) and os.listdir(self.repo_name):
+                self.finished.emit(True, f"Successfully cloned {self.repo_name}.")
+            else:
+                # Handle unexpected case where the repo doesn't exist after a 'successful' clone
+                self.finished.emit(False, f"Git clone succeeded but the folder {self.repo_name} is empty.")
+        else:
+            # Error case: Provide more detailed output
+            error_detail = error_msg if error_msg else (output if output else "An unknown error occurred.")
+            self.finished.emit(False, f"Git clone failed: {error_detail}")
+
+        self.process.readyReadStandardOutput.connect(self.capture_stdout)
+        self.process.readyReadStandardError.connect(self.capture_stderr)
+
+    def capture_stdout(self):
+        output = self.process.readAllStandardOutput().data().decode('utf-8').strip()
+        print(f"Standard Output: {output}")
+
+    def capture_stderr(self):
+        error_msg = self.process.readAllStandardError().data().decode('utf-8').strip()
+        print(f"Standard Error: {error_msg}")
+
 class ModpackUpdateWorker(QThread):
     finished = pyqtSignal(bool, str)
+    progress = pyqtSignal(int)  # Optional progress signal if a progress bar is desired
 
     def __init__(self, repo_path):
         super().__init__()
@@ -154,66 +183,43 @@ class ModpackUpdateWorker(QThread):
 
     def run(self):
         try:
+            # Check if the repo path exists and is a valid Git repository
+            if not os.path.exists(self.repo_path) or not os.path.isdir(self.repo_path):
+                self.finished.emit(False, f"Invalid repository path: {self.repo_path}")
+                return
+
+            # Initialize the Git repository
             repo = Repo(self.repo_path)
 
-            # Perform git pull and submodule update
+            # Perform git pull and update the submodules
+            print("Pulling latest changes...")
             repo.remotes.origin.pull()
-            for submodule in repo.submodules:
-                submodule.update(init=True, recursive=True)
 
-            # Emit success signal
+            # Count total submodules for progress tracking
+            total_submodules = len(repo.submodules)
+            for idx, submodule in enumerate(repo.submodules):
+                try:
+                    print(f"Updating submodule: {submodule.name} ({idx + 1}/{total_submodules})")
+                    submodule.update(init=True, recursive=True)
+
+                    # Emit progress update (optional)
+                    progress_percent = int(((idx + 1) / total_submodules) * 100)
+                    self.progress.emit(progress_percent)
+                except GitCommandError as submodule_error:
+                    self.finished.emit(False, f"Failed to update submodule '{submodule.name}': {str(submodule_error)}")
+                    return
+
+            # Emit success signal if everything was updated
             self.finished.emit(True, "Modpack updated successfully.")
         except GitCommandError as e:
             self.finished.emit(False, f"Failed to update modpack: {str(e)}")
         except Exception as e:
             self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
 
-class CooniesDownloadWorker(QThread):
-    progress = pyqtSignal(int)  # Signal to update progress
-    finished = pyqtSignal(bool, str)  # Signal to indicate completion
-
-    def __init__(self, url, local_zip_path, unzip_folder, progress_dialog, parent=None):
-        super().__init__(parent)
-        self.url = url
-        self.local_zip_path = local_zip_path
-        self.unzip_folder = unzip_folder
-        self.progress_dialog = progress_dialog
-
-    def run(self):
-        try:
-            # Download the zip file
-            response = requests.get(self.url, stream=True)
-            total_size = int(response.headers.get('content-length', 0))  # Total size in bytes
-            downloaded_size = 0
-
-            if response.status_code == 200:
-                with open(self.local_zip_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=1024):  # Download in 1KB chunks
-                        if chunk:
-                            f.write(chunk)
-                            downloaded_size += len(chunk)
-
-                            # Calculate progress percentage
-                            progress_percent = int(downloaded_size * 100 / total_size)
-                            self.progress.emit(progress_percent)  # Emit progress
-
-                # Unzip the file to the target folder
-                with zipfile.ZipFile(self.local_zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(self.unzip_folder)
-
-                # Clean up the zip file
-                os.remove(self.local_zip_path)
-
-                self.finished.emit(True, "Successfully downloaded Coonie's Modpack.")
-            else:
-                self.finished.emit(False, "Failed to download Coonie's Modpack.")
-        except Exception as e:
-            self.finished.emit(False, f"Error during downloading: {str(e)}")
-
 class MultiModpackWorker(QThread):
     progress = pyqtSignal(int)
     status_message = pyqtSignal(str)
-    finished = pyqtSignal()
+    finished = pyqtSignal(bool, str)  # Signal with two arguments (success, message)
 
     def __init__(self, modpack_names, operation, main_window):
         super().__init__()
@@ -222,67 +228,105 @@ class MultiModpackWorker(QThread):
         self.main_window = main_window
 
     def run(self):
-        for index, modpack_name in enumerate(self.modpack_names):
-            # Check for cancellation
-            if self.isInterruptionRequested():
-                break
+        try:
+            for index, modpack_name in enumerate(self.modpack_names):
+                # Check for cancellation
+                if self.isInterruptionRequested():
+                    self.status_message.emit("Operation cancelled.")
+                    self.finished.emit(False, "Operation cancelled by the user.")
+                    return
 
-            clone_url = self.get_modpack_url(modpack_name)
-            if not clone_url:
-                self.status_message.emit(f"URL not found for {modpack_name}. Skipping.")
-                self.progress.emit(index + 1)
-                continue  # Skip if URL not found
+                # Fetch the modpack URL
+                clone_url = self.get_modpack_url(modpack_name)
+                if not clone_url:
+                    self.status_message.emit(f"URL not found for {modpack_name}. Skipping.")
+                    self.progress.emit(index + 1)
+                    continue
 
-            # Determine the repo name
-            if clone_url.endswith('.git'):
-                repo_name = clone_url.split('/')[-1].replace('.git', '')
-            else:
-                repo_name = modpack_name.replace(' ', '_')
+                # Determine the repository name
+                repo_name = self.get_repo_name(clone_url, modpack_name)
+                repo_path = os.path.join(os.getcwd(), repo_name)
 
-            repo_path = os.path.join(os.getcwd(), repo_name)
-
-            try:
-                if self.operation == 'download':
-                    # If the modpack exists, remove it before re-downloading
-                    if os.path.isdir(repo_path):
-                        self.status_message.emit(f"Removing existing {modpack_name}...")
-                        shutil.rmtree(repo_path, onerror=readonly_handler)
-                    # Download the modpack
-                    self.status_message.emit(f"Downloading {modpack_name}...")
-                    self.download_modpack(clone_url, repo_name)
-                elif self.operation == 'update':
-                    if os.path.isdir(repo_path):
-                        # Update the modpack
-                        self.status_message.emit(f"Updating {modpack_name}...")
-                        self.update_modpack(repo_path)
+                try:
+                    if self.operation == 'download':
+                        # Handle the download operation
+                        self.handle_download(clone_url, repo_name, modpack_name, repo_path)
+                    elif self.operation == 'update':
+                        # Handle the update operation
+                        self.handle_update(modpack_name, repo_path)
                     else:
-                        self.status_message.emit(f"Modpack {modpack_name} not found. Cannot update.")
-                else:
-                    # Invalid operation
-                    self.status_message.emit(f"Invalid operation for {modpack_name}.")
-            except Exception as e:
-                error_message = f"Error processing {modpack_name}: {e}"
-                print(error_message)
-                self.status_message.emit(error_message)
+                        self.status_message.emit(f"Invalid operation for {modpack_name}.")
+                except Exception as e:
+                    error_message = f"Error processing {modpack_name}: {e}"
+                    print(error_message)
+                    self.status_message.emit(error_message)
 
-            # Update progress
-            self.progress.emit(index + 1)
+                # Update progress
+                self.progress.emit(int(((index + 1) / len(self.modpack_names)) * 100))
 
-        self.finished.emit()
+            # Emit success when all modpacks are processed without interruption
+            self.finished.emit(True, "All modpacks processed successfully.")
+        except Exception as e:
+            self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
 
     def get_modpack_url(self, modpack_name):
+        """Retrieve the URL for the specified modpack."""
         modpack_info = self.main_window.get_modpack_info(modpack_name)
-        if modpack_info:
-            return modpack_info['url']
+        return modpack_info['url'] if modpack_info else ""
+
+    def get_repo_name(self, clone_url, modpack_name):
+        """Determine the name of the repository based on the clone URL or modpack name."""
+        if clone_url.endswith('.git'):
+            return clone_url.split('/')[-1].replace('.git', '')
+        return modpack_name.replace(' ', '_')
+
+    def handle_download(self, clone_url, repo_name, modpack_name, repo_path):
+        """Handle the download operation for a modpack."""
+        # Check for cancellation before downloading
+        if self.isInterruptionRequested():
+            self.status_message.emit(f"Operation cancelled while processing {modpack_name}.")
+            self.finished.emit(False, "Operation cancelled by the user.")
+            return
+
+        # If the modpack exists, remove it before re-downloading
+        if os.path.isdir(repo_path):
+            self.status_message.emit(f"Removing existing {modpack_name}...")
+            shutil.rmtree(repo_path, onerror=readonly_handler)
+
+        # Download the modpack
+        self.status_message.emit(f"Downloading {modpack_name}...")
+        self.download_modpack(clone_url, repo_name)
+
+    def handle_update(self, modpack_name, repo_path):
+        """Handle the update operation for a modpack."""
+        if os.path.isdir(repo_path):
+            self.status_message.emit(f"Updating {modpack_name}...")
+            self.update_modpack(repo_path)
         else:
-            return ""
+            self.status_message.emit(f"Modpack {modpack_name} not found. Cannot update.")
+            self.finished.emit(False, f"Modpack {modpack_name} not found. Cannot update.")
 
     def download_modpack(self, clone_url, repo_name):
+        """Download a modpack from a given URL, including submodules if applicable."""
         try:
             if clone_url.endswith('.git'):
-                # Clone the repository
-                git.Repo.clone_from(clone_url, repo_name, recursive=True)
-                print(f"Downloaded {repo_name}")
+                # Clone the repository with submodules
+                self.status_message.emit(f"Cloning repository: {repo_name}...")
+                repo = git.Repo.clone_from(clone_url, repo_name, recursive=True)
+
+                # Emit status message for each submodule during the download
+                if repo.submodules:
+                    total_submodules = len(repo.submodules)
+                    for idx, submodule in enumerate(repo.submodules):
+                        self.status_message.emit(f"Downloading submodule: {submodule.name} ({idx + 1}/{total_submodules})")
+                        submodule.update(init=True, recursive=True)
+
+                        # Emit progress for submodules (optional)
+                        progress_percent = int(((idx + 1) / total_submodules) * 100)
+                        self.progress.emit(progress_percent)
+
+                print(f"Downloaded {repo_name} with submodules.")
+                self.status_message.emit(f"Downloaded {repo_name} with all submodules.")
             else:
                 # Handle direct downloads
                 self.download_direct_modpack(clone_url, repo_name)
@@ -290,34 +334,78 @@ class MultiModpackWorker(QThread):
             error_message = f"Failed to download {repo_name}: {e}"
             print(error_message)
             self.status_message.emit(error_message)
-
-    def update_modpack(self, repo_path):
-        try:
-            repo = git.Repo(repo_path)
-            repo.remotes.origin.pull()
-            print(f"Updated {os.path.basename(repo_path)}")
-        except Exception as e:
-            error_message = f"Failed to update {os.path.basename(repo_path)}: {e}"
-            print(error_message)
-            self.status_message.emit(error_message)
+            self.finished.emit(False, error_message)
 
     def download_direct_modpack(self, clone_url, repo_name):
+        """Handle direct download of a modpack if it's not a Git repository."""
         try:
             response = requests.get(clone_url, stream=True)
             response.raise_for_status()
             zip_file_path = os.path.join(os.getcwd(), f"{repo_name}.zip")
+
             with open(zip_file_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
+                    if self.isInterruptionRequested():
+                        self.status_message.emit(f"Operation cancelled while downloading {repo_name}.")
+                        self.finished.emit(False, "Operation cancelled by the user.")
+                        return
                     f.write(chunk)
+
             # Unzip the file
             with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
                 zip_ref.extractall(repo_name)
             os.remove(zip_file_path)
+            self.status_message.emit(f"Downloaded and extracted {repo_name}")
             print(f"Downloaded and extracted {repo_name}")
         except Exception as e:
             error_message = f"Failed to download {repo_name}: {e}"
             print(error_message)
             self.status_message.emit(error_message)
+            self.finished.emit(False, error_message)
+
+    def update_modpack(self, repo_path):
+        """Update an existing modpack."""
+        try:
+            # Check if the repo path exists and is a valid Git repository
+            if not os.path.exists(repo_path) or not os.path.isdir(repo_path):
+                self.finished.emit(False, f"Invalid repository path: {repo_path}")
+                return
+
+            # Initialize the Git repository
+            repo = Repo(repo_path)
+
+            # Perform git pull to get the latest changes
+            print("Pulling latest changes...")
+            self.status_message.emit("Pulling latest changes...")
+            repo.remotes.origin.pull()
+
+            # Count total submodules for progress tracking
+            total_submodules = len(repo.submodules)
+            for idx, submodule in enumerate(repo.submodules):
+                try:
+                    submodule_name = submodule.name
+                    print(f"Updating submodule: {submodule_name} ({idx + 1}/{total_submodules})")
+                    self.status_message.emit(f"Updating submodule: {submodule_name} ({idx + 1}/{total_submodules})")
+
+                    # Update submodule (init if needed, update recursively)
+                    submodule.update(init=True, recursive=True)
+
+                    # Emit progress update (optional)
+                    progress_percent = int(((idx + 1) / total_submodules) * 100)
+                    self.progress.emit(progress_percent)
+                except GitCommandError as submodule_error:
+                    error_message = f"Failed to update submodule '{submodule_name}': {str(submodule_error)}"
+                    print(error_message)
+                    self.status_message.emit(error_message)
+                    self.finished.emit(False, error_message)
+                    return
+
+            # Emit success signal if everything was updated
+            self.finished.emit(True, "Modpack updated successfully.")
+        except GitCommandError as e:
+            self.finished.emit(False, f"Failed to update modpack: {str(e)}")
+        except Exception as e:
+            self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
 
 
 ############################################################
@@ -701,7 +789,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         if selected_modpack == "Coonies-Modpack":
             self.apply_coonies_play_button_style()
-        elif selected_modpack == "Elbes-Modpack":
+        elif selected_modpack == "elbes-Modpack":
             self.apply_elbes_play_button_style()
         else:
             self.apply_default_play_button_style()
@@ -2141,8 +2229,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         except Exception as e:
             print(f"Error fetching latest tag message: {e}")
             return "Error fetching the latest version."
-
-
 
     def update_modpack(self):
         modpack_name = self.modpack_var.currentText()
