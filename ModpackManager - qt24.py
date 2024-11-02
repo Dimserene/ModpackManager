@@ -1,6 +1,6 @@
-import os, random, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform
+import subprocess, math, os, random, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform
 from datetime import datetime
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtGui import QColor, QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer, QProcess, QThread, pyqtSignal, QPoint
 from PyQt6.QtWidgets import QFrame, QProgressDialog, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
 from git import Repo, GitCommandError
@@ -41,9 +41,20 @@ elif system_platform == "Linux":
 SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 
-DATE = "2024/10/27"
+DATE = "2024/11/03"
 ITERATION = "24"
-VERSION = "1.5.2"
+VERSION = "1.5.3"
+
+def set_git_buffer_size():
+    try:
+        # Increase the buffer size globally
+        subprocess.run(['git', 'config', '--global', 'http.postBuffer', '524288000'], check=True)
+        print("Git buffer size set to 500MB")
+    except subprocess.CalledProcessError as e:
+        print(f"Failed to set Git buffer size: {e}")
+
+# Call this function before performing Git operations
+set_git_buffer_size()
 
 ############################################################
 # Worker class for downloading/updating modpack in the background
@@ -601,10 +612,17 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         layout = QGridLayout()
 
         # Title label
-        self.title_label = QLabel("☷☷☷☷Dimserene's Modpack Manager☷☷☷☷", self)
+        self.title_label = QLabel("☷☷☷Dimserene's Modpack Manager☷☷☷", self)
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setStyleSheet("font: 16pt 'Helvetica';")
         layout.addWidget(self.title_label, 0, 0, 1, 6, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Initialize variables for breathing effect
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_color)
+        self.timer.start(150)  # Adjust the interval for smoother or slower color changes
+
+        self.breathing_phase = 0
 
         # PLAY button
         self.play_button = QPushButton("PLAY", self)
@@ -614,7 +632,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Installed modpack info
         self.installed_info_label = QLabel("", self)
-        self.installed_info_label.setStyleSheet("font: 12pt 'Helvetica';")
+        self.installed_info_label.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.installed_info_label, 2, 0, 1, 6)
 
         # Refresh button
@@ -644,7 +662,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Download button
         self.download_button = QPushButton("Download", self)
-        self.download_button.setStyleSheet("font: 16pt 'Helvetica';")
+        self.download_button.setStyleSheet("font: 12pt 'Helvetica';")
         layout.addWidget(self.download_button, 6, 0, 1, 2)
         self.download_button.clicked.connect(lambda: self.download_modpack(main_window=self))
         self.download_button.setToolTip("Download (clone) selected modpack to the same directory as manager")
@@ -672,84 +690,84 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Quick Update button
         self.update_button = QPushButton("Quick Update", self)
-        self.update_button.setStyleSheet("font: 16pt 'Helvetica';")
+        self.update_button.setStyleSheet("font: 12pt 'Helvetica';")
         layout.addWidget(self.update_button, 6, 2, 1, 2)
         self.update_button.clicked.connect(self.update_modpack)
         self.update_button.setToolTip("Quickly update downloaded modpacks (can be malfunctioned)")
 
         # Multi-Download/Update button
         self.multi_download_button = QPushButton("Multi Mode", self)
-        self.multi_download_button.setStyleSheet("font: 16pt 'Helvetica';")
+        self.multi_download_button.setStyleSheet("font: 12pt 'Helvetica';")
         layout.addWidget(self.multi_download_button, 6, 4, 1, 2)
         self.multi_download_button.clicked.connect(self.open_multi_modpack_popup)
         self.multi_download_button.setToolTip("Download or update multiple modpacks at once")
 
         # Install button
         self.install_button = QPushButton("Install (Copy)", self)
-        self.install_button.setStyleSheet("font: 16pt 'Helvetica';")
+        self.install_button.setStyleSheet("font: 12pt 'Helvetica';")
         layout.addWidget(self.install_button, 7, 0, 1, 3)
         self.install_button.clicked.connect(self.install_modpack)
         self.install_button.setToolTip("Copy (install) Mods content")
 
         # Uninstall button
         self.uninstall_button = QPushButton("Uninstall (Remove)", self)
-        self.uninstall_button.setStyleSheet("font: 16pt 'Helvetica';")
+        self.uninstall_button.setStyleSheet("font: 12pt 'Helvetica';")
         layout.addWidget(self.uninstall_button, 7, 3, 1, 3)
         self.uninstall_button.clicked.connect(self.uninstall_modpack)
         self.uninstall_button.setToolTip("Delete Mods folder and its contents")
 
         # Time Travel button
         self.revert_button = QPushButton("Time Travel", self)
-        self.revert_button.setStyleSheet("font: 12pt 'Helvetica';")
+        self.revert_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.revert_button, 8, 0, 1, 2)
         self.revert_button.clicked.connect(self.open_revert_popup)
         self.revert_button.setToolTip("Revert the modpack to a certain historical version")
 
         # Verify Integrity button
         self.verify_button = QPushButton("Verify Integrity", self)
-        self.verify_button.setStyleSheet("font: 12pt 'Helvetica';")
+        self.verify_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.verify_button, 8, 2, 1, 2)  # Adjust grid position as needed
         self.verify_button.clicked.connect(self.verify_modpack_integrity)
         self.verify_button.setToolTip("Check modpack for missing or incomplete files")
 
         # Auto backup button
         self.backup_button = QPushButton("Backup Save", self)
-        self.backup_button.setStyleSheet("font: 12pt 'Helvetica';")
+        self.backup_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.backup_button, 8, 4, 1, 2)
         self.backup_button.clicked.connect(self.auto_backup_popup)
         self.backup_button.setToolTip("Automatically backup saves in set duration")
 
         # Check Versions button
         self.check_versions_button = QPushButton("Check Versions", self)
-        self.check_versions_button.setStyleSheet("font: 12pt 'Helvetica';")
+        self.check_versions_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.check_versions_button, 9, 0, 1, 3)
         self.check_versions_button.clicked.connect(self.check_versions)
         self.check_versions_button.setToolTip("Check latest version for all modpacks")
 
         # Install Lovely button
         self.install_lovely_button = QPushButton("Install/Update lovely", self)
-        self.install_lovely_button.setStyleSheet("font: 12pt 'Helvetica';")
+        self.install_lovely_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.install_lovely_button, 9, 3, 1, 3)
         self.install_lovely_button.clicked.connect(self.install_lovely_injector)
         self.install_lovely_button.setToolTip("Install/update lovely injector")
 
         # Mod List button
         self.mod_list_button = QPushButton("Mod List", self)
-        self.mod_list_button.setStyleSheet("font: 12pt 'Helvetica';")
+        self.mod_list_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.mod_list_button, 10, 0, 1, 2)
         self.mod_list_button.clicked.connect(self.open_mod_list)
         self.mod_list_button.setToolTip("Open mod list in web browser")
 
         # Settings button
         self.open_settings_button = QPushButton("Settings", self)
-        self.open_settings_button.setStyleSheet("font: 12pt 'Helvetica';")
+        self.open_settings_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.open_settings_button, 10, 2, 1, 2)
         self.open_settings_button.clicked.connect(self.open_settings_popup)
         self.open_settings_button.setToolTip("Settings")
 
         # Discord button
         self.discord_button = QPushButton("Join Discord", self)
-        self.discord_button.setStyleSheet("font: 12pt 'Helvetica';")
+        self.discord_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.discord_button, 10, 4, 1, 2)
         self.discord_button.clicked.connect(self.open_discord)
         self.discord_button.setToolTip("Open Discord server in web browser")
@@ -762,7 +780,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.tutorial_link.setStyleSheet("""
             QLabel {
                 color: #0087eb;  /* Blue link color */
-                font-size: 10pt;
+                font-size: 8pt;
                 text-decoration: underline;  /* Underline the text to make it look like a link */
             }
             QLabel:hover {
@@ -796,6 +814,25 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Update the settings with the new default modpack
         self.settings["default_modpack"] = selected_modpack
+
+    def update_color(self):
+        # Calculate the breathing effect (sinusoidal pattern)
+        self.breathing_phase += 0.005  # 10x slower change
+        intensity = (math.sin(self.breathing_phase) + 1) / 2  # Value between 0 and 1
+
+        # Create a dimmer rainbow color effect based on phase, starting from black
+        red = int(63 * intensity * (math.sin(self.breathing_phase) + 1))  # Dimmer colors (0-127)
+        green = int(63 * intensity * (math.sin(self.breathing_phase + 2 * math.pi / 3) + 1))
+        blue = int(63 * intensity * (math.sin(self.breathing_phase + 4 * math.pi / 3) + 1))
+
+        color = QColor(red, green, blue)
+        color_hex = color.name()
+
+        # Update label's color without changing font size
+        self.title_label.setStyleSheet(
+            f"font: 16pt 'Helvetica'; "
+            f"color: {color_hex};"
+        )
 
 ############################################################
 # Multi Mode
@@ -3019,10 +3056,10 @@ if __name__ == "__main__":
         QPushButton {
             border: 1px solid gray;
             border-radius: 5px;
-            padding-top: 10px;   /* Equivalent to ipady */
-            padding-bottom: 10px; /* Equivalent to ipady */
-            padding-left: 10px;  /* Equivalent to ipadx */
-            padding-right: 10px; /* Equivalent to ipadx */
+            padding-top: 8px;   /* Equivalent to ipady */
+            padding-bottom: 8px; /* Equivalent to ipady */
+            padding-left: 5px;  /* Equivalent to ipadx */
+            padding-right: 5px; /* Equivalent to ipadx */
             background-color: #f3f3f3;  /* Default background color */
         }
                     
