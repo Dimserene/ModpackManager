@@ -6,6 +6,7 @@
 /dist/Cruel-Pack/
 /dist/Coonies-ModPack/
 /dist/Taquin-Paquet/
+/dist/elbes-ModPack/
 *.spec
 excluded_mods.json
 user_settings.json

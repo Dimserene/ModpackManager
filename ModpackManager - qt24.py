@@ -41,9 +41,9 @@ elif system_platform == "Linux":
 SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 
-DATE = "2024/11/03"
+DATE = "2024/11/06"
 ITERATION = "24"
-VERSION = "1.5.3"
+VERSION = "1.5.4"
 
 def set_git_buffer_size():
     try:
@@ -578,13 +578,18 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             self.prompt_update(latest_version, download_url, changelog)
 
     def prompt_update(self, latest_version, download_url, changelog):
-        reply = QMessageBox.information(
+        # Display the update prompt with "Ok" and "Cancel" buttons
+        reply = QMessageBox.question(
             self,
             "Update Available",
-            f"A new version ({latest_version}) is available.\nChangelog:\n{changelog}\n\nPlease download it from the official website.",
-            QMessageBox.StandardButton.Ok
+            f"A new version ({latest_version}) is available.\nChangelog:\n{changelog}\n\nWould you like to download it from the official website?",
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
         )
-        webbrowser.open(download_url)
+
+        # Open the download URL only if the user clicked "Ok"
+        if reply == QMessageBox.StandardButton.Ok:
+            webbrowser.open(download_url)
+
 
     def apply_modpack_styles(self, modpack_name):
         """Apply styles to UI elements based on the selected modpack"""
@@ -1906,92 +1911,68 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         return commit_messages
 
     def get_version_info(self):
+        # Paths for version and modpack name files
         mods_path = os.path.join(os.path.expandvars(self.mods_dir), "ModpackUtil")
-        
         current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
+        modpack_name_file = os.path.join(mods_path, 'ModpackName.txt')
         modpack_util_file = os.path.join(mods_path, 'ModpackUtil.lua')
 
-        current_version = None
+        current_version, pack_name = None, ""
 
-        self.settings = self.load_settings()
-
+        # Load the current version if available
         if os.path.exists(current_version_file):
-            try:
-                with open(current_version_file, 'r') as file:
-                    current_version = file.read().strip()
-            except IOError as e:
-                print(f"IOError reading CurrentVersion.txt: {e}")
+            current_version = self.read_file_content(current_version_file)
 
-        pack_name = ""
-        if os.path.exists(modpack_util_file):
-            try:
-                with open(modpack_util_file, 'r') as file:
-                    for line in file:
-                        if line.startswith('--- VERSION:'):
-                            pack_name = line.split(':')[1].strip()
-                            break
-            except IOError as e:
-                print(f"IOError reading ModpackUtil.lua: {e}")
+        # Attempt to load the modpack name from ModpackName.txt
+        if os.path.exists(modpack_name_file):
+            pack_name = self.read_file_content(modpack_name_file)
         else:
-            pack_name = None
+            # Fallback to extracting from ModpackUtil.lua if ModpackName.txt is missing
+            pack_name = self.extract_pack_name(modpack_util_file)
         
         return current_version, pack_name
-    
+
     def update_installed_info(self):
+        # Load user settings once
         self.settings = self.load_settings()
 
+        # Paths for version and modpack name files
         install_path = os.path.expandvars(self.settings["mods_directory"])
         mods_path = os.path.join(install_path, 'ModpackUtil')
-
         current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
-        current_pack_file = os.path.join(mods_path, 'CurrentPack.txt')  # New file to check
+        modpack_name_file = os.path.join(mods_path, 'ModpackName.txt')
         modpack_util_file = os.path.join(mods_path, 'ModpackUtil.lua')
 
-        current_version = None
-        pack_name = None
+        # Attempt to read the current version
+        current_version = self.read_file_content(current_version_file)
 
+        # Attempt to read the modpack name from ModpackName.txt, or fallback to ModpackUtil.lua
+        pack_name = self.read_file_content(modpack_name_file) or self.extract_pack_name(modpack_util_file)
+
+        # Update installed info label with pack name and version
+        info_text = f"Installed pack: {pack_name} ({current_version})" if pack_name else "No modpack installed or ModpackUtil mod removed."
+        self.installed_info_label.setText(info_text)
+        self.installed_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+    def read_file_content(self, file_path):
+        """Helper to read content from a file."""
         try:
-            # First check if CurrentVersion.txt exists and read the version
-            if os.path.exists(current_version_file):
-                try:
-                    with open(current_version_file, 'r') as file:
-                        current_version = file.read().strip()
-                except IOError as e:
-                    print(f"IOError reading CurrentVersion.txt: {e}")
+            with open(file_path, 'r') as file:
+                return file.read().strip()
+        except IOError as e:
+            print(f"IOError reading {file_path}: {e}")
+            return None
 
-            # Check if CurrentPack.txt exists and use its content as pack_name
-            if os.path.exists(current_pack_file):
-                try:
-                    with open(current_pack_file, 'r') as file:
-                        pack_name = file.read().strip()
-                except IOError as e:
-                    print(f"IOError reading CurrentPack.txt: {e}")
-            else:
-                # Fallback to checking ModpackUtil.lua if CurrentPack.txt does not exist
-                if os.path.exists(modpack_util_file):
-                    try:
-                        with open(modpack_util_file, 'r') as file:
-                            for line in file:
-                                if line.startswith('--- VERSION:'):
-                                    pack_name = line.split(':')[1].strip()
-                                    break
-                    except IOError as e:
-                        print(f"IOError reading ModpackUtil.lua: {e}")
-
-            # Update the installed info label with the pack name and version
-            if pack_name:
-                self.installed_info_label.setText(f"Installed pack: {pack_name} ({current_version})")
-                self.installed_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            else:
-                self.installed_info_label.setText("No modpack installed or ModpackUtil mod removed.")
-                self.installed_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        except Exception as e:
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"An error occurred while updating installed info: {str(e)}")
-            msg_box.exec()
+    def extract_pack_name(self, lua_file_path):
+        """Helper to extract the pack name from ModpackUtil.lua."""
+        try:
+            with open(lua_file_path, 'r') as file:
+                for line in file:
+                    if line.startswith('--- VERSION:'):
+                        return line.split(':')[1].strip()
+        except IOError as e:
+            print(f"IOError reading {lua_file_path}: {e}")
+        return None
 
     def update_modpack_description(self):
         selected_modpack = self.modpack_var.currentText()
@@ -2180,73 +2161,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             self.progress_dialog.move(dialog_geometry.topLeft())  # Move to the new position
 
         QApplication.processEvents()  # Ensure the UI is responsive
-
-    def download_and_unzip_coonies_modpack(self):
-        """Download and unzip Coonie's Modpack with progress tracking."""
-        try:
-            url = "https://github.com/GayCoonie/Coonies-Mod-Pack/releases/latest/download/Mods.zip"
-            local_zip_path = os.path.join(os.getcwd(), "Mods.zip")
-            unzip_folder = os.path.join(os.getcwd(), "Coonies-Modpack")
-
-            # Ensure the folder exists
-            if not os.path.exists(unzip_folder):
-                os.makedirs(unzip_folder)
-
-            # Create and configure the progress dialog
-            progress_dialog = QProgressDialog("Downloading Coonie's Modpack...", None, 0, 100, self)
-            progress_dialog.setWindowTitle("Download Progress")
-            progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-            progress_dialog.setAutoClose(True)
-
-            # Create the download worker for downloading in a background thread
-            self.download_worker = CooniesDownloadWorker(url, local_zip_path, unzip_folder, progress_dialog)
-            self.download_worker.progress.connect(progress_dialog.setValue)  # Update progress dialog
-            self.download_worker.finished.connect(self.on_coonies_download_finished)  # Handle download completion
-
-            # Start the download in a separate thread
-            self.download_worker.start()
-
-            # Show the progress dialog
-            progress_dialog.exec()
-
-        except Exception as e:
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"An error occurred while setting up the download: {str(e)}")
-            msg_box.exec()
-
-    def on_coonies_download_finished(self, success, message):
-        """Handle the download finished event."""
-        msg_box = QMessageBox()
-        if success:
-            # Handle success
-            msg_box.setIcon(QMessageBox.Icon.Information)
-            msg_box.setWindowTitle("Success")
-            msg_box.setText(message)
-
-            # Optionally, create CurrentVersion.txt and CurrentPack.txt files here
-            modpack_util_path = os.path.join(os.getcwd(), "Coonies-Modpack", 'Mods', 'ModpackUtil')
-            if not os.path.exists(modpack_util_path):
-                os.makedirs(modpack_util_path)
-
-            # Write to CurrentVersion.txt and CurrentPack.txt
-            current_version_path = os.path.join(modpack_util_path, 'CurrentVersion.txt')
-            with open(current_version_path, 'w') as version_file:
-                version_file.write(self.get_latest_tag_message())
-
-            current_pack_path = os.path.join(modpack_util_path, 'CurrentPack.txt')
-            with open(current_pack_path, 'w') as pack_file:
-                pack_file.write("Coonie's Modpack")
-
-        else:
-            # Handle failure
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(message)
-
-        msg_box.exec()
-
 
     def get_latest_tag_message(self):
         """Fetch the latest tag message from the Coonie's Modpack GitHub repository."""
@@ -2849,62 +2763,38 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             install_path = self.mods_dir
             mods_path = os.path.join(install_path, 'ModpackUtil')
 
+            # Define file paths
             current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
             modpack_util_file = os.path.join(mods_path, 'ModpackUtil.lua')
             current_pack_file = os.path.join(mods_path, 'CurrentPack.txt')  # For Coonie's modpack
 
-            current_version = None
-            if os.path.exists(current_version_file):
-                try:
-                    with open(current_version_file, 'r') as file:
-                        current_version = file.read().strip()
-                except IOError as e:
-                    print(f"IOError reading CurrentVersion.txt: {e}")
+            # Load current version
+            current_version = self.read_file_content(current_version_file)
 
-            pack_name = ""
-            # Check if CurrentPack.txt exists for Coonie's modpack
-            if os.path.exists(current_pack_file):
-                try:
-                    with open(current_pack_file, 'r') as file:
-                        pack_name = file.read().strip()
-                except IOError as e:
-                    print(f"IOError reading CurrentPack.txt: {e}")
-            elif os.path.exists(modpack_util_file):
-                # Check ModpackUtil.lua for version information
-                try:
-                    with open(modpack_util_file, 'r') as file:
-                        for line in file:
-                            if line.startswith('--- VERSION:'):
-                                pack_name = line.split(':')[1].strip()
-                                break
-                except IOError as e:
-                    print(f"IOError reading ModpackUtil.lua: {e}")
-            else:
-                pack_name = None
+            # Determine pack name
+            pack_name = self.read_file_content(current_pack_file) or self.extract_pack_name(modpack_util_file)
 
+            # Fetch commit messages
             commit_messages = self.fetch_commit_messages()
-
-            version_info = ""
             coonies_version_info = self.get_latest_coonies_tag()
-            installed_info = ""
-            update_message = ""
 
+            # Prepare version information
+            version_info = ""
+            update_message = ""
             for repo_name, commit_message in commit_messages.items():
                 version_info += f"{repo_name}:\t{commit_message}\n"
+                # Check if an update is needed
+                if pack_name == repo_name and current_version and commit_message != current_version:
+                    update_message = "Update available!"
 
-                if pack_name == repo_name:
-                    if current_version and commit_message != current_version:
-                        update_message = "Update available!"
-            
-            if pack_name:
-                installed_info = f"\nInstalled modpack: {pack_name}\nInstalled version: {current_version}"
-            else:
-                installed_info = "\nNo modpack installed or ModpackUtil mod removed."
+            # Prepare installed information
+            installed_info = f"\nInstalled modpack: {pack_name}\nInstalled version: {current_version}" if pack_name else "\nNo modpack installed or ModpackUtil mod removed."
 
+            # Display version and update information
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Information)
             msg_box.setWindowTitle("Version Information")
-            msg_box.setText(f"{version_info}\nCoonie's:\t{coonies_version_info}\n{installed_info}\n\n{update_message}")
+            msg_box.setText(f"{version_info}\nCoonie's:\t{coonies_version_info}")
             msg_box.exec()
 
         except Exception as e:
@@ -2914,6 +2804,25 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.setText(f"An error occurred while checking versions: {str(e)}")
             msg_box.exec()
 
+    def read_file_content(self, file_path):
+        """Helper function to read file content and handle IOErrors."""
+        try:
+            with open(file_path, 'r') as file:
+                return file.read().strip()
+        except IOError as e:
+            print(f"IOError reading {file_path}: {e}")
+            return None
+
+    def extract_pack_name(self, lua_file_path):
+        """Helper to extract the pack name from ModpackUtil.lua."""
+        try:
+            with open(lua_file_path, 'r') as file:
+                for line in file:
+                    if line.startswith('--- VERSION:'):
+                        return line.split(':')[1].strip()
+        except IOError as e:
+            print(f"IOError reading {lua_file_path}: {e}")
+        return None
 
     def get_latest_coonies_tag(self):
         """Fetch the latest tag name from the Coonie's Modpack GitHub repository."""
