@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.5.3",
+  "latest_version": "1.5.4",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "Attempt to fix some git issues when downloading.",
+  "changelog": "Bug fixes.",
   "modpack_categories": [
     {
       "category": "Dimserene",
