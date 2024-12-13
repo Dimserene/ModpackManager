@@ -22,11 +22,6 @@
           "description": "Enhances the core game with small improvements while staying true to the original experience."
         },
         {
-          "name": "Insane-Pack",
-          "url": "https://github.com/Dimserene/Insane-Pack.git",
-          "description": "A collection of broken and extremely overpowered mods."
-        },
-        {
           "name": "Cruel-Pack",
           "url": "https://github.com/Dimserene/Cruel-Pack.git",
           "description": "A harsh and unforgiving modpack for experienced players."
