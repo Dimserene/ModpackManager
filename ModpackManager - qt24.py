@@ -41,9 +41,9 @@ elif system_platform == "Linux":
 SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 
-DATE = "2024/11/06"
+DATE = "2024/12/21"
 ITERATION = "24"
-VERSION = "1.5.4"
+VERSION = "1.5.5"
 
 def set_git_buffer_size():
     try:
@@ -525,7 +525,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Proceed only if data is available
         if not self.modpack_data:
-            QMessageBox.critical(self, "Error", "Failed to load modpack data.")
+            QMessageBox.critical(self, "Error", "Failed to load modpack data. Please check your internet connection.")
             return
 
         self.create_widgets()
@@ -1081,7 +1081,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # self.auto_install_checkbox = QCheckBox("Install Modpack After Download/Update", popup)
         # self.auto_install_checkbox.setChecked(self.settings.get("auto_install_after_download", False))
         # layout.addWidget(self.auto_install_checkbox, 10, 0, 1, 2)
-
 
         # Reset to Default Button
         self.default_button = QPushButton("Reset to Default", popup)
@@ -2369,10 +2368,13 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Define mod dependencies: {'mod_that_depends': ['required_mod1', 'required_mod2', ...]}
         dependencies = {
             "Cryptid": ["Talisman"],
-            "JokerDisplayModSupport": ["JokerDisplay"],
-            "ModpackDecks": ["SDM_0-s-Stuff", "JankJonklers"],
+            "ModpackDecks": ["SDM_0-s-Stuff"],
             "Jestobiology": ["Fusion-Jokers"],
-            "JensAlmanac": ["Aurinko", "Cryptid", "Fusion-Jokers", "Incantation", "JenLib", "Talisman"]
+            "Vultbines_Joker": ["Fusion-Jokers"],
+            "Tsunami": ["Fusion-Jokers"],
+            "AntonosStakes": ["Talisman"],
+            "Bmjokers": ["Bmwallet"],
+            "Oiiman-s-Additions": ["Cryptid", "Talisman"],
             # Add more dependencies as needed
         }
 
@@ -2749,7 +2751,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Information)
             msg_box.setWindowTitle("Verification Result")
-            msg_box.setText(f"The following mods are not downloaded correctly:\n\n{folder_list}")
+            msg_box.setText(f"The following mods are not downloaded correctly. Please attempt reclone:\n\n{folder_list}")
             msg_box.exec()
         else:
             msg_box = QMessageBox()
@@ -2916,7 +2918,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Check if the user has already joined the official Discord
         webbrowser.open("https://discord.com/invite/balatro")
         webbrowser.open("https://discord.com/channels/1116389027176787968/1255696773599592458")
-
 
     def open_mod_list(self, event=None): 
         webbrowser.open("https://docs.google.com/spreadsheets/d/1L2wPG5mNI-ZBSW_ta__L9EcfAw-arKrXXVD-43eU4og")
