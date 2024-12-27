@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.5.5",
+  "latest_version": "1.5.6",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "Modified some failcase notifications to be more clear; Added new mod dependancies.",
+  "changelog": "Verify modpacks automatically after clone/update; check if lovely injector is installed before play.",
   "modpack_categories": [
     {
       "category": "Dimserene",
