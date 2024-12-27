@@ -41,9 +41,9 @@ elif system_platform == "Linux":
 SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 
-DATE = "2024/12/21"
+DATE = "2024/12/27"
 ITERATION = "24"
-VERSION = "1.5.5"
+VERSION = "1.5.6"
 
 def set_git_buffer_size():
     try:
@@ -496,6 +496,7 @@ class TutorialPopup(QDialog):
 ############################################################
 
 class ModpackManagerApp(QWidget):  # or QMainWindow
+    
     def __init__(self, *args, **kwargs):
         super(ModpackManagerApp, self).__init__(*args, **kwargs)
         self.setWindowTitle("Dimserene's Modpack Manager")
@@ -1769,6 +1770,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 ############################################################
 
     def play_game(self):
+        # Check if Lovely Injector is installed
+        if not self.check_lovely_injector_installed():
+            # If the user chooses not to install Lovely Injector, abort launching the game
+            QMessageBox.warning(
+                self, 
+                "Cannot Launch Game", 
+                "Lovely Injector is required to play the modded game. Launch aborted."
+            )
+            return
+
         self.settings = self.load_settings()
         self.game_dir = self.settings.get("game_directory")
         self.profile_name = self.settings.get("profile_name")        
@@ -2108,6 +2119,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         msg_box.setText(message)
         msg_box.exec()
 
+        # If successful, verify the integrity of the downloaded modpack
+        if success:
+            self.verify_modpack_integrity()
+
         # Check the setting and install modpack if needed
         if success and self.settings.get("auto_install_after_download", False):
             self.install_modpack()
@@ -2267,6 +2282,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         msg_box.setWindowTitle("Update Status" if success else "Error")
         msg_box.setText(message)
         msg_box.exec()
+
+        # If successful, verify the integrity of the downloaded modpack
+        if success:
+            self.verify_modpack_integrity()
 
         # Check the setting and install modpack if needed
         if success and self.settings.get("auto_install_after_download", False):
@@ -2914,6 +2933,29 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             error_box.setText(f"An unexpected error occurred during installation: {str(e)}")
             error_box.exec()
 
+    def check_lovely_injector_installed(self):
+        """Check if Lovely Injector is installed and prompt the user to install if not."""
+        lovely_dll_path = os.path.join(self.game_dir, "version.dll")
+
+        if not os.path.exists(lovely_dll_path):
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Question)
+            msg_box.setWindowTitle("Lovely Injector Not Found")
+            msg_box.setText(
+                "Lovely Injector is not installed. It is required for the game to function properly.\n"
+                "Would you like to install it now?"
+            )
+            msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            msg_box.setDefaultButton(QMessageBox.StandardButton.Yes)
+
+            if msg_box.exec() == QMessageBox.StandardButton.Yes:
+                self.install_lovely_injector()
+                return True
+            else:
+                return False  # User declined to install Lovely Injector
+
+        return True  # Lovely Injector is installed
+
     def open_discord(self, event=None):
         # Check if the user has already joined the official Discord
         webbrowser.open("https://discord.com/invite/balatro")
@@ -2945,6 +2987,7 @@ def center_window(window, width, height):
     window.setGeometry(int(x), int(y), width, height)
     
 if __name__ == "__main__":
+
     app = QApplication([])  # Initialize the QApplication
     root = ModpackManagerApp()  # No need to pass 'root', since the window is handled by PyQt itself
 
