@@ -2,7 +2,7 @@ import subprocess, math, os, random, re, shutil, requests, webbrowser, zipfile, 
 from datetime import datetime
 from PyQt6.QtGui import QColor, QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer, QProcess, QThread, pyqtSignal, QPoint
-from PyQt6.QtWidgets import QFrame, QProgressDialog, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
+from PyQt6.QtWidgets import QScrollArea, QFrame, QProgressDialog, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
 from git import Repo, GitCommandError
 os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
 
@@ -41,9 +41,9 @@ elif system_platform == "Linux":
 SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 
-DATE = "2024/12/27"
+DATE = "2024/12/28"
 ITERATION = "24"
-VERSION = "1.5.6"
+VERSION = "1.5.7"
 
 def set_git_buffer_size():
     try:
@@ -643,9 +643,12 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Refresh button
         self.refresh_button = QPushButton("Refresh", self)
-        layout.addWidget(self.refresh_button, 3, 2, 1, 2)
-        self.refresh_button.clicked.connect(self.update_installed_info)
+        self.refresh_button.setStyleSheet("font: 10pt 'Helvetica';")
         self.refresh_button.setToolTip("Refresh currently installed modpack information")
+        self.refresh_button.clicked.connect(self.update_installed_info)
+
+        # Add the refresh button to the layout and center it
+        layout.addWidget(self.refresh_button, 3, 0, 1, 6, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Modpack selection dropdown
         self.modpack_label = QLabel("Select Modpack:", self)
@@ -2373,136 +2376,123 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         popup = QDialog(self)
         popup.setWindowTitle("Mod Selection")
 
-        # Create a grid layout for the popup
-        layout = QGridLayout(popup)
+        # Get screen dimensions
+        screen_geometry = QApplication.primaryScreen().availableGeometry()
+        screen_height = screen_geometry.height()
 
-        # Instruction label with "DO NOT" in red
-        label = QLabel('<span style="font-size: 16pt; font-family: Helvetica;">Select the mods you <span style="color: red;">DO NOT</span> want to install:</span>', popup)
+        # Set fixed width and dynamic height
+        fixed_width = 600  # Adjust as needed for the popup width
+        max_height = min(int(screen_height * 0.8), screen_height - 100)  # Limit height to 80% of the screen height
+        popup.setFixedWidth(fixed_width)
+        popup.setMaximumHeight(max_height)
+
+        # Create a main layout for the popup
+        layout = QVBoxLayout(popup)
+
+        # Instruction label
+        label = QLabel('<span style="font-size: 16pt; font-family: Helvetica;">Select the mods you <span style="color: red;">DO NOT</span> want to install:</span>')
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(label, 0, 0, 1, -1)  # Span the label across all columns
+        layout.addWidget(label)
 
-        # List of locked mods that cannot be deselected
+        # Search bar and clear button layout
+        search_layout = QHBoxLayout()
+        search_bar = QLineEdit(popup)
+        search_bar.setPlaceholderText("Search mods...")
+        clear_search_button = QPushButton("Clear", popup)
+        search_layout.addWidget(search_bar)
+        search_layout.addWidget(clear_search_button)
+        layout.addLayout(search_layout)
+
+        # Create a scroll area to hold the mod checkboxes
+        scroll_area = QScrollArea(popup)
+        scroll_area.setWidgetResizable(True)
+
+        # Create a container widget for the scroll area
+        scroll_content = QWidget()
+        scroll_layout = QGridLayout(scroll_content)
+
+        # List of locked mods
         locked_mods = ["ModpackUtil", "Steamodded"]
 
-        # Define mod dependencies: {'mod_that_depends': ['required_mod1', 'required_mod2', ...]}
-        dependencies = {
-            "Cryptid": ["Talisman"],
-            "ModpackDecks": ["SDM_0-s-Stuff"],
-            "Jestobiology": ["Fusion-Jokers"],
-            "Vultbines_Joker": ["Fusion-Jokers"],
-            "Tsunami": ["Fusion-Jokers"],
-            "AntonosStakes": ["Talisman"],
-            "Bmjokers": ["Bmwallet"],
-            "Oiiman-s-Additions": ["Cryptid", "Talisman"],
-            # Add more dependencies as needed
-        }
-
-        # Exclude "ModpackUtil" and "Steamodded" from mod selection
-        filtered_mod_list = [mod for mod in mod_list if mod not in locked_mods]
-
-        # Create a list of checkboxes for each mod
+        # Create checkboxes for mods
         mod_vars = []
-        mods_per_column = 20  # Number of mods per column
+        mods_per_column = 2  # Two columns
 
-        for index, mod in enumerate(filtered_mod_list):
-            var = QCheckBox(mod, popup)
-            var.setChecked(mod in self.excluded_mods)
-            mod_vars.append((mod, var))
+        for index, mod in enumerate(mod_list):
+            if mod not in locked_mods:
+                var = QCheckBox(mod)
+                var.setChecked(mod in self.excluded_mods)
+                mod_vars.append((mod, var))
 
-            # Calculate row and column position
-            row = (index % mods_per_column) + 1  # Row position
-            column = index // mods_per_column  # Column position
+                # Calculate row and column for grid layout
+                row = index // mods_per_column
+                column = index % mods_per_column
+                scroll_layout.addWidget(var, row, column)
 
-            # Connect the checkbox state change event to handle dependencies
-            var.stateChanged.connect(lambda state, mod=mod, var=var: self.handle_dependencies(mod, var, mod_vars, dependencies))
+        scroll_content.setLayout(scroll_layout)
+        scroll_area.setWidget(scroll_content)
 
-            # Add the checkbox to the layout
-            layout.addWidget(var, row, column)
+        # Add the scroll area to the main layout
+        layout.addWidget(scroll_area)
 
-        # Function to clear all selections
-        def clear_all():
-            for _, var in mod_vars:
-                var.setChecked(False)
+        # Filter function for search bar
+        def filter_mods():
+            search_text = search_bar.text().lower()
+            for mod, checkbox in mod_vars:
+                checkbox.setVisible(search_text in mod.lower())
 
-        # Function to reverse the selections
-        def reverse_select():
-            for _, var in mod_vars:
-                var.blockSignals(True)  # Temporarily block signals to avoid triggering stateChanged handlers
-                var.setChecked(not var.isChecked())
-                var.blockSignals(False)  # Re-enable signals after changing the state
+        # Clear search bar
+        def clear_search():
+            search_bar.clear()
+            filter_mods()
 
-        # Function to randomly select mods and apply dependencies
-        def feel_lucky():
-            for _, var in mod_vars:
-                var.blockSignals(True)  # Temporarily block signals to avoid triggering stateChanged handlers
-                var.setChecked(random.choice([True, False]))  # Randomly check/uncheck the mod
-                var.blockSignals(False)  # Re-enable signals after changing the state
-            
-            # Ensure dependencies are respected after random selection
-            for mod, var in mod_vars:
-                if var.isChecked():
-                    self.handle_dependencies(mod, var, mod_vars, dependencies)
+        search_bar.textChanged.connect(filter_mods)
+        clear_search_button.clicked.connect(clear_search)
 
-        # Create the buttons
-        clear_button = QPushButton("Clear All", popup)
-        clear_button.clicked.connect(clear_all)
+        # Button functions for filtered mods
+        def clear_all_filtered():
+            search_text = search_bar.text().lower()
+            for mod, checkbox in mod_vars:
+                if checkbox.isVisible() and search_text in mod.lower():
+                    checkbox.setChecked(False)
 
-        reverse_button = QPushButton("Reverse Select", popup)
-        reverse_button.clicked.connect(reverse_select)
+        def reverse_select_filtered():
+            search_text = search_bar.text().lower()
+            for mod, checkbox in mod_vars:
+                if checkbox.isVisible() and search_text in mod.lower():
+                    checkbox.setChecked(not checkbox.isChecked())
 
-        feel_lucky_button = QPushButton("I Feel Lucky", popup)
-        feel_lucky_button.clicked.connect(feel_lucky)
+        def feel_lucky_filtered():
+            search_text = search_bar.text().lower()
+            for mod, checkbox in mod_vars:
+                if checkbox.isVisible() and search_text in mod.lower():
+                    checkbox.setChecked(random.choice([True, False]))
 
-        save_button = QPushButton("Save && Install", popup)
-        save_button.clicked.connect(lambda: self.save_and_install(mod_vars, popup))
-
-        # Create a container widget for the buttons and a horizontal layout for centering
+        # Buttons for actions
         button_container = QWidget(popup)
         button_layout = QHBoxLayout(button_container)
+        clear_button = QPushButton("Clear All", popup)
+        reverse_button = QPushButton("Reverse Select", popup)
+        feel_lucky_button = QPushButton("I Feel Lucky", popup)
+        save_button = QPushButton("Save && Install", popup)
 
-        # Add buttons to the container's layout
+        clear_button.clicked.connect(clear_all_filtered)
+        reverse_button.clicked.connect(reverse_select_filtered)
+        feel_lucky_button.clicked.connect(feel_lucky_filtered)
+        save_button.clicked.connect(lambda: self.save_and_install(mod_vars, popup))
+
         button_layout.addWidget(clear_button)
         button_layout.addWidget(reverse_button)
-        button_layout.addWidget(feel_lucky_button)  # Add "I Feel Lucky" button
+        button_layout.addWidget(feel_lucky_button)
         button_layout.addWidget(save_button)
-
-        # Align the buttons to the center of the row
-        button_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # Add the container widget to the grid layout, spanning all columns
-        layout.addWidget(button_container, mods_per_column + 1, 0, 1, -1)
-
-        # Create the "Backup Mods Folder" checkbox
-        self.backup_checkbox = QCheckBox("Backup Mods Folder", popup)
-        self.backup_checkbox.setChecked(self.settings.get("backup_mods", False))  # Set based on saved settings
-
-        # Create the "Remove Mods Folder" checkbox
-        self.remove_checkbox = QCheckBox("Remove Mods Folder", popup)
-        self.remove_checkbox.setChecked(self.settings.get("remove_mods", True))  # Set based on saved settings or default
-
-        # Create a layout for the checkboxes
-        checkbox_container = QWidget(popup)
-        checkbox_layout = QHBoxLayout(checkbox_container)
-
-        # Add both checkboxes to the layout
-        checkbox_layout.addWidget(self.backup_checkbox)
-        checkbox_layout.addWidget(self.remove_checkbox)
-
-        # Align the checkboxes to the center
-        checkbox_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # Add the container widget with the checkboxes to the layout, spanning all columns
-        layout.addWidget(checkbox_container, mods_per_column + 2, 0, 1, -1)
+        layout.addWidget(button_container)
 
         # Close event handler to reset the flag when the window is closed
-        def settings_on_close():
+        def on_close():
             self.install_popup_open = False
             popup.close()
 
-        # Connect the close event to the handler
-        popup.finished.connect(settings_on_close)
-
-        # Show the dialog as modal
+        popup.finished.connect(on_close)
         popup.exec()
 
     def handle_dependencies(self, mod, var, mod_vars, dependencies):
