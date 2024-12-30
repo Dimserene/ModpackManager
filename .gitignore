@@ -1,12 +1,5 @@
 /build/
-/dist/Dimserenes-Modpack/
-/dist/Fine-tuned-Pack/
-/dist/Vanilla-Plus-Pack/
-/dist/Insane-Pack/
-/dist/Cruel-Pack/
-/dist/Coonies-ModPack/
-/dist/Taquin-Paquet/
-/dist/elbes-ModPack/
+/dist/
 *.spec
 excluded_mods.json
 user_settings.json
