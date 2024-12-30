@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.5.7",
+  "latest_version": "1.6.0",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Centers refresh button.\n- Makes mod selection popup scrollable.\n- Adds a search/filter bar to the mod selection popup.",
+  "changelog": "Completely reworked the mod selection UI, added support for modpack genres and tags.\nMight introduce many new bugs, but it's worth it.",
   "modpack_categories": [
     {
       "category": "Dimserene",
