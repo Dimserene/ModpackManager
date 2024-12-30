@@ -1,7 +1,7 @@
 {
   "latest_version": "1.6.0",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "Completely reworked the mod selection UI, added support for modpack genres and tags.\nMight introduce many new bugs, but it's worth it.",
+  "changelog": "Completely reworked the mod selection UI, added support for modpack genres and tags.\nMight introduce many new bugs.",
   "modpack_categories": [
     {
       "category": "Dimserene",
