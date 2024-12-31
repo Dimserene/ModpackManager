@@ -1,13 +1,10 @@
-import subprocess, math, os, random, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform
+import tempfile, subprocess, math, os, random, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform
 from datetime import datetime
 from PyQt6.QtGui import QColor, QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer, QProcess, QThread, pyqtSignal, QPoint
-from PyQt6.QtWidgets import QSplitter, QListWidgetItem, QScrollArea, QFrame, QProgressDialog, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
+from PyQt6.QtWidgets import QMenu, QSplitter, QListWidgetItem, QScrollArea, QFrame, QProgressDialog, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
 from git import Repo, GitCommandError
-import tempfile
 import pandas as pd
-from oauth2client.service_account import ServiceAccountCredentials
-os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
 
 ############################################################
 # Detect OS and set default settings
@@ -45,15 +42,14 @@ SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 FAVORITES_FILE = "favorites.json"
 
-DATE = "2024/12/30"
+DATE = "2024/12/31"
 ITERATION = "25"
-VERSION = "1.6.0"
+VERSION = "1.6.1"
 
 def set_git_buffer_size():
     try:
         # Increase the buffer size globally
         subprocess.run(['git', 'config', '--global', 'http.postBuffer', '524288000'], check=True)
-        print("Git buffer size set to 500MB")
     except subprocess.CalledProcessError as e:
         print(f"Failed to set Git buffer size: {e}")
 
@@ -122,55 +118,27 @@ def populate_genres_tags(list_widget, genre_tags):
             tag_item.setFlags(tag_item.flags())  # Non-editable
             list_widget.addItem(tag_item)
 
-# Map mods to their metadata (Genre and Tags)
+# Map mods to their metadata (Genre, Tags, and Description)
 def map_mods_to_metadata(data):
     metadata = {}
     for _, row in data.iterrows():
         folder_name = row['Folder Name']  # Folder Name
-        genre = row['Genre']  # Genre
-        tags = row['Tags']  # Tags
+        genre = row.get('Genre', "Unknown")  # Genre
+        tags = row.get('Tags', "")  # Tags
+        description = row.get('Description', "No description available.")  # Description
+        page_link = row.get('Page Link', "")  # Page Link
+        discord_link = row.get('Discord Link', "")  # Discord Link
 
         # Add data to metadata dictionary
         metadata[folder_name] = {
             "Genre": genre if pd.notna(genre) else "Unknown",
-            "Tags": [tag.strip() for tag in tags.split(',')] if pd.notna(tags) else []
+            "Tags": [tag.strip() for tag in tags.split(',')] if pd.notna(tags) else [],
+            "Description": description.strip() if pd.notna(description) else "No description available.",
+            "Page Link": page_link.strip() if pd.notna(page_link) else "",
+            "Discord Link": discord_link.strip() if pd.notna(discord_link) else ""
+
         }
     return metadata
-
-def preprocess_metadata(data):
-    """
-    Preprocess metadata to merge genres and tags for duplicate folder names.
-
-    Args:
-        data (list): List of dictionaries, each containing 'Folder Name', 'Genre', and 'Tags'.
-
-    Returns:
-        dict: Processed metadata with merged genres and tags for each folder name.
-    """
-    processed_metadata = {}
-    
-    for row in data:
-        folder_name = row["Folder Name"]
-        genres = row["Genre"].split(",")  # Split genres into a list
-        tags = row["Tags"].split(",")  # Split tags into a list
-
-        if folder_name not in processed_metadata:
-            processed_metadata[folder_name] = {
-                "Genre": set(),
-                "Tags": set(),
-            }
-        
-        # Merge genres and tags into the existing entry
-        processed_metadata[folder_name]["Genre"].update(genre.strip() for genre in genres)
-        processed_metadata[folder_name]["Tags"].update(tag.strip() for tag in tags)
-    
-    # Convert sets back to lists for easier usage later
-    for folder_name, details in processed_metadata.items():
-        details["Genre"] = list(details["Genre"])
-        details["Tags"] = list(details["Tags"])
-    
-    return processed_metadata
-
 
 class ModpackDownloadWorker(QThread):
     finished = pyqtSignal(bool, str)
@@ -611,7 +579,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.metadata = {}
 
         # Load favorite mods
-        self.favorite_mods = self.load_favorites()
+        self.favorite_mods = set()  # Initialize favorites
+        self.load_favorites()  # Load favorites on startup
 
         # Load and process the CSV data
         data = fetch_csv_data(sheet_url)  # Replace with your CSV-fetching logic
@@ -872,7 +841,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.install_lovely_button.setToolTip("Install/update lovely injector")
 
         # Mod List button
-        self.mod_list_button = QPushButton("Mod List", self)
+        self.mod_list_button = QPushButton("Mod List / Feedback", self)
         self.mod_list_button.setStyleSheet("font: 10pt 'Helvetica';")
         layout.addWidget(self.mod_list_button, 10, 0, 1, 2)
         self.mod_list_button.clicked.connect(self.open_mod_list)
@@ -2523,6 +2492,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
 
+        left_scroll_area = QScrollArea(popup)
+        left_scroll_area.setWidgetResizable(True)
+        left_scroll_area.setWidget(left_panel)
+
         # Search bar
         search_bar = QLineEdit(popup)
         search_bar.setPlaceholderText("Search mods...")
@@ -2561,27 +2534,59 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
 
-        scroll_area = QScrollArea(popup)
-        scroll_area.setWidgetResizable(True)
+        right_scroll_area = QScrollArea(popup)
+        right_scroll_area.setWidgetResizable(True)
 
         mod_container = QWidget()
         mod_layout = QVBoxLayout(mod_container)
         mod_layout.setAlignment(Qt.AlignmentFlag.AlignTop)  # Align mods to the top of the container
 
-        scroll_area.setWidget(mod_container)
-        right_layout.addWidget(scroll_area)
+        right_scroll_area.setWidget(mod_container)
+        right_layout.addWidget(right_scroll_area)
+
+        def add_context_menu(mod_row_container, mod, metadata):
+            """Add a right-click context menu to the mod row."""
+            def open_discord():
+                discord_url = metadata.get(mod, {}).get("Discord Link", None)
+                if discord_url:
+                    webbrowser.open(discord_url)
+                else:
+                    QMessageBox.information(mod_row_container, "Info", "Discord link not available for this mod.")
+
+            def open_mod_page():
+                mod_page_url = metadata.get(mod, {}).get("Page Link", None)
+                if mod_page_url:
+                    webbrowser.open(mod_page_url)
+                else:
+                    QMessageBox.information(mod_row_container, "Info", "Mod page link not available for this mod.")
+
+            # Add context menu to mod row
+            def show_context_menu(event):
+                if event.button() == Qt.MouseButton.RightButton:
+                    context_menu = QMenu(mod_row_container)
+                    discord_action = context_menu.addAction("Visit Discord Channel")
+                    github_action = context_menu.addAction("Visit Mod Page")
+
+                    # Connect actions to their respective functions
+                    discord_action.triggered.connect(open_discord)
+                    github_action.triggered.connect(open_mod_page)
+
+                    # Show the menu at the cursor's position
+                    context_menu.exec(event.globalPosition().toPoint())
+
+            mod_row_container.mousePressEvent = show_context_menu
 
         mod_vars = []  # Clear any existing data
         favorite_mods = self.load_favorites()  # Load favorites at the start
 
         def toggle_favorite(label, mod):
             """Toggle favorite state for the given mod."""
-            if mod in favorite_mods:
-                favorite_mods.remove(mod)
+            if mod in self.favorite_mods:
+                self.favorite_mods.remove(mod)
                 label.setText("☆")  # Empty star
             else:
-                favorite_mods.add(mod)
-                label.setText("★")  # Solid black star
+                self.favorite_mods.add(mod)
+                label.setText("★")  # Solid star
             
             self.save_favorites()  # Save favorites whenever they are toggled
             filter_mods()  # Reapply the filter to reflect changes immediately
@@ -2604,6 +2609,21 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             star_label.setCursor(Qt.CursorShape.PointingHandCursor)  # Clickable star
             star_label.mousePressEvent = lambda event, mod=mod, label=star_label: toggle_favorite(label, mod)
 
+            # Attach the context menu to the mod row container
+            add_context_menu(mod_row_container, mod, self.metadata)
+
+            # Retrieve metadata for the mod
+            mod_metadata = self.metadata.get(mod, {})
+            genre = mod_metadata.get("Genre", "Unknown")
+            tags = ", ".join(mod_metadata.get("Tags", []))
+            description = mod_metadata.get("Description", "No description available.")
+            
+            # Combine metadata into a tooltip text
+            tooltip_text = f"<b>Genre:</b> {genre}<br><b>Tags:</b> {tags}<br><b>Description:</b> {description}"
+            
+            # Set the tooltip for the checkbox
+            mod_checkbox.setToolTip(tooltip_text)
+
             # Append all elements to mod_vars
             mod_vars.append((mod_row_container, mod, mod_checkbox, star_label))
 
@@ -2617,12 +2637,13 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 lambda state, mod_name=mod, mod_var=mod_checkbox: self.handle_dependencies(mod_name, mod_var, mod_vars, dependencies)
             )
 
+
         # Add panels to splitter
-        splitter.addWidget(left_panel)
-        splitter.addWidget(right_panel)
+        splitter.addWidget(left_scroll_area)
+        splitter.addWidget(right_scroll_area)
 
         # Set fixed width for left panel
-        splitter.setSizes([100, 600])  # 200px for left panel, remaining for right panel
+        splitter.setSizes([600, 600])  # 200px for left panel, remaining for right panel
         splitter.setStretchFactor(0, 1)  # No stretch for left panel
         splitter.setStretchFactor(1, 1)  # Stretchable right panel
 
@@ -2644,7 +2665,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 matches_query = query in mod.lower()
                 matches_genre = not selected_genres or mod_genre in selected_genres
                 matches_tags = not selected_tags or bool(selected_tags.intersection(mod_tags))
-                is_favorite = mod in favorite_mods
+                is_favorite = mod in self.favorite_mods  # Use self.favorite_mods directly
 
                 # Determine visibility
                 should_show = matches_query and matches_genre and matches_tags
@@ -2652,8 +2673,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                     should_show = should_show and is_favorite
 
                 mod_row_container.setVisible(should_show)
-                
-
 
         # Connect the "Show favorites" checkbox to the filter function
         favorite_filter_checkbox.stateChanged.connect(filter_mods)
@@ -2775,28 +2794,29 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             with open(INSTALL_FILE, "r") as f:
                 return [line.strip() for line in f.readlines()]
 
-    def save_favorites(self):
-        """Save the favorite mods to a file."""
-        try:
-            with open(FAVORITES_FILE, "w") as f:
-                json.dump(list(self.favorite_mods), f)  # Convert set to list for JSON serialization
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save favorite mods. Error: {e}")
-
+    # Load favorites from the file
     def load_favorites(self):
-        """Load the favorite mods from a file."""
-        if os.path.exists(FAVORITES_FILE):
-            try:
-                with open(FAVORITES_FILE, "r") as f:
-                    data = f.read().strip()  # Read and strip whitespace
-                    if not data:
-                        return set()  # Return empty set if file is empty
-                    return set(json.loads(data))  # Convert list back to set
-            except (json.JSONDecodeError, ValueError) as e:
-                QMessageBox.warning(self, "Warning", f"Failed to load favorite mods. The file is corrupted. Error: {e}")
-                self.reset_favorites_file()
-                return set()  # Return empty set if JSON is invalid
-        return set()  # Return empty set if the file doesn't exist
+        """Load favorite mods from a JSON file."""
+        favorites_file = "favorites.json"  # Path to favorites file
+        try:
+            if os.path.exists(favorites_file):
+                with open(favorites_file, "r") as f:
+                    self.favorite_mods = set(json.load(f))  # Load favorites into a set
+            else:
+                self.favorite_mods = set()  # Initialize as an empty set if the file doesn't exist
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Error loading favorites: {e}")
+            self.favorite_mods = set()  # Default to empty set on failure
+
+    # Save favorites to the file
+    def save_favorites(self):
+        """Save favorite mods to a JSON file."""
+        favorites_file = "favorites.json"  # Path to favorites file
+        try:
+            with open(favorites_file, "w") as f:
+                json.dump(list(self.favorite_mods), f, indent=4)  # Save favorites as a list
+        except IOError as e:
+            print(f"Error saving favorites: {e}")
 
     def reset_favorites_file(self):
         """Reset the favorites file if corrupted."""
