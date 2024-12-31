@@ -2601,7 +2601,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             mod_row_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
             mod_checkbox = QCheckBox(mod, popup)
-            mod_checkbox.setChecked(True)  # Default to checked
+            mod_checkbox.setChecked(mod not in self.excluded_mods)  # Default to checked
 
             # Add a star label for favorite mods
             star_label = QLabel("★" if mod in self.favorite_mods else "☆", popup)
@@ -2769,30 +2769,35 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             exclude_dependent_mods(mod)
 
     def save_preferences(self, mod_vars):
-        # Let the user pick mods they DON'T want to install
-        self.excluded_mods = [mod for mod, var in mod_vars if not var.isChecked()]
-
-        # Save user preferences to a file
-        with open(INSTALL_FILE, "w") as f:
-            for mod in self.excluded_mods:
-                f.write(mod + "\n")
-
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle("Preferences Saved")
-        msg_box.setText(f"Excluded mods saved: {self.excluded_mods}")
-        msg_box.exec()
-        print(f"Excluded mods: {self.excluded_mods}")  # Debugging
+        # Collect mods that are unchecked (excluded from installation)
+        excluded_mods = [mod for mod, var in mod_vars if not var.isChecked()]
+        try:
+            with open(INSTALL_FILE, "w") as f:
+                json.dump(excluded_mods, f, indent=4)
+            print(f"Excluded mods saved successfully: {excluded_mods}")
+        except Exception as e:
+            print(f"Failed to save excluded mods: {e}")
 
     def read_preferences(self):
-        # If the preferences file doesn't exist, create an empty one
         if not os.path.exists(INSTALL_FILE):
+            # Initialize file with an empty JSON array if it doesn't exist
             with open(INSTALL_FILE, "w") as f:
-                f.write("")  # Create an empty file
-            return []  # Return an empty list of excluded mods
-        else:
+                json.dump([], f)
+            print(f"Created new exclusion file: {INSTALL_FILE}")
+            return []
+        
+        try:
             with open(INSTALL_FILE, "r") as f:
-                return [line.strip() for line in f.readlines()]
+                # Ensure JSON parsing and handle potential errors
+                excluded_mods = json.load(f)
+                if not isinstance(excluded_mods, list):  # Validate data type
+                    print("Invalid data format in excluded_mods.json, resetting to empty list.")
+                    return []
+                print(f"Loaded excluded mods: {excluded_mods}")
+                return excluded_mods
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Error loading excluded mods: {e}. Resetting to empty list.")
+            return []
 
     # Load favorites from the file
     def load_favorites(self):
@@ -2827,6 +2832,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             QMessageBox.critical(self, "Error", f"Failed to reset favorite mods file. Error: {e}")
 
     def install_mods(self, popup):
+
+        # Read excluded mods
+        excluded_mods = self.read_preferences()
         modpack_name = self.modpack_var.currentText()
 
         # Handle special case for "Coonie's Modpack"
@@ -2906,24 +2914,21 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 QMessageBox.critical(self, "Error", f"Failed to install mandatory mod: {mod}. Error: {e}")
                 return
 
-        # Install mods that are not in the excluded_mods list
-        for mod in self.get_mod_list(mods_src):
-            if mod not in self.excluded_mods:
+        # Install all mods except excluded ones
+        for mod in os.listdir(mods_src):
+            if mod not in excluded_mods:
+                print(f"Installing mod: {mod}")
                 source_mod_path = os.path.join(mods_src, mod)
                 destination_mod_path = os.path.join(self.mods_dir, mod)
-
-                # Copy the mod folder to the installation directory
                 try:
                     if os.path.exists(destination_mod_path):
-                        shutil.rmtree(destination_mod_path)  # Remove old version of the mod if it exists
+                        shutil.rmtree(destination_mod_path)
                     shutil.copytree(source_mod_path, destination_mod_path)
                 except Exception as e:
-                    msg_box = QMessageBox()
-                    msg_box.setIcon(QMessageBox.Icon.Critical)
-                    msg_box.setWindowTitle("Error")
-                    msg_box.setText(f"Failed to install mod: {mod}. Error: {e}")
-                    msg_box.exec()
+                    QMessageBox.critical(self, "Error", f"Failed to install mod: {mod}. Error: {e}")
                     return
+            else:
+                print(f"Skipping excluded mod: {mod}")
 
         # Close the installation popup if it exists
         if popup:
@@ -2936,7 +2941,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         msg_box.setWindowTitle("Install Status")
         msg_box.setText("Successfully installed modpack.")
         msg_box.exec()
-
         
     def save_and_install(self, mod_vars, popup):
         self.save_preferences(mod_vars)
