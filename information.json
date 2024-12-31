@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.1",
+  "latest_version": "1.6.2",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Added functionality: hover over a mod to see its genre, tags, and description.\n- Added functionality: right click on mods to visit their discord thread or mod page.\n- Fixed mod selection left panel too long (added scrollable area).\n- Fixed favorite mods not being saved whatsoever.",
+  "changelog": "Fixed excluded mods not loaded in when selecting mods",
   "modpack_categories": [
     {
       "category": "Dimserene",
