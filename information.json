@@ -2,6 +2,23 @@
   "latest_version": "1.6.3",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
   "changelog": "Fixed quick update functionality (Finally).",
+
+  "dependencies": {
+    "Cryptid": ["Talisman"],
+    "ModpackDecks": ["SDM_0-s-Stuff"],
+    "Jestobiology": ["Fusion-Jokers"],
+    "Vultbines_Joker": ["Fusion-Jokers"],
+    "Tsunami": ["Fusion-Jokers"],
+    "AntonosStakes": ["Talisman"],
+    "Bmjokers": ["Bmwallet"],
+    "Oiiman-s-Additions": ["Cryptid", "Talisman"],
+    "TatteredDecks": ["Galdur"],
+    "TOGAPackBalatro": ["Talisman"],
+    "MoreFluff": ["Talisman"],
+    "JoJokers": ["Talisman"],
+    "Gemstones": ["Talisman"]
+  },
+
   "modpack_categories": [
     {
       "category": "Dimserene",

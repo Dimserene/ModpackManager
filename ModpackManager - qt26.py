@@ -44,7 +44,7 @@ FAVORITES_FILE = "favorites.json"
 
 DATE = "2025/01/03"
 ITERATION = "26"
-VERSION = "1.6.3"
+VERSION = "1.6.4"
 
 def set_git_buffer_size():
     try:
@@ -73,6 +73,36 @@ def fetch_modpack_data(url):
         return None
 
 modpack_data = fetch_modpack_data(url)
+
+import requests
+
+def fetch_dependencies(url):
+    """
+    Fetch dependencies from the `information.json` file.
+
+    Args:
+        url (str): URL of the `information.json` file.
+
+    Returns:
+        dict: Dictionary of dependencies from the JSON file.
+    """
+    try:
+        print(f"Fetching dependencies from {url}...")
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+
+        # Print the fetched JSON to verify structure
+        print("Fetched JSON:", data)
+
+        # Extract dependencies
+        dependencies = data.get("dependencies", {})
+        print("Dependencies fetched successfully:", dependencies)
+        return dependencies
+    except requests.RequestException as e:
+        print(f"Failed to fetch dependencies: {e}")
+        return {}
+
 
 # URL to the public Google Sheet (export as CSV format)
 sheet_url = "https://docs.google.com/spreadsheets/d/1L2wPG5mNI-ZBSW_ta__L9EcfAw-arKrXXVD-43eU4og/export?format=csv&gid=510782711"
@@ -263,14 +293,14 @@ def update_submodules(repo):
         repo.git.submodule('init')  # Initialize new submodules
         repo.git.submodule('update', '--recursive', '--remote')  # Update all submodules recursively
 
-        # Handle removed submodules
-        print("Checking for removed submodules...")
+        # Handle removed submodules only if .gitmodules exists
         submodules_path = os.path.join(repo.working_tree_dir, '.gitmodules')
         if os.path.exists(submodules_path):
-            repo.git.rm('--cached', '-f', submodules_path)
+            print("Checking for removed submodules...")
+            repo.git.rm('--cached', '-f', '.gitmodules')
             print("Removed stale submodules from .gitmodules.")
         
-        # Reinitialize submodules after changes
+        # Reinitialize submodules after potential changes
         repo.git.submodule('sync')
         repo.git.submodule('init')
         repo.git.submodule('update', '--recursive', '--remote')
@@ -279,6 +309,7 @@ def update_submodules(repo):
     except GitCommandError as e:
         print(f"Failed to update submodules: {str(e)}")
         raise
+
 
 class ModpackUpdateWorker(QThread):
     finished = pyqtSignal(bool, str)
@@ -2461,24 +2492,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             return []
         
     def popup_mod_selection(self, mod_list):
-
-        # Define mod dependencies: {'mod_that_depends': ['required_mod1', 'required_mod2', ...]}
-        dependencies = {
-            "Cryptid": ["Talisman"],
-            "ModpackDecks": ["SDM_0-s-Stuff"],
-            "Jestobiology": ["Fusion-Jokers"],
-            "Vultbines_Joker": ["Fusion-Jokers"],
-            "Tsunami": ["Fusion-Jokers"],
-            "AntonosStakes": ["Talisman"],
-            "Bmjokers": ["Bmwallet"],
-            "Oiiman-s-Additions": ["Cryptid", "Talisman"],
-            "TatteredDecks": ["Galdur"],
-            "TOGAPackBalatro": ["Talisman"],
-            "MoreFluff": ["Talisman"],
-            "JoJokers": ["Talisman"],
-            # Add more dependencies as needed
-        }
-
+        dependencies = fetch_dependencies(url)
         # Add mods to the right panel
         always_installed = {"Steamodded", "ModpackUtil"}  # Mods that are always installed and not displayed
 
@@ -2650,7 +2664,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             # Connect state change event for dependency handling
             mod_checkbox.stateChanged.connect(
-                lambda state, mod_name=mod, mod_var=mod_checkbox: self.handle_dependencies(mod_name, mod_var, mod_vars, dependencies)
+                lambda state, mod_name=mod, mod_var=mod_checkbox: self.handle_dependencies(state, mod_name, mod_var, mod_vars, dependencies)
             )
 
 
@@ -2738,31 +2752,27 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         popup.finished.connect(on_close)
         popup.exec()
 
-    def handle_dependencies(self, mod, var, mod_vars, dependencies):
+    def handle_dependencies(self, state, mod, var, mod_vars, dependencies):
         """
         Handle mod dependencies when a checkbox is clicked (checked = included).
-        
+
         Args:
-            mod (str): The name of the mod whose state changed.
-            var (QCheckBox): The checkbox associated with the mod.
+            state (int): State of the checkbox (Qt.CheckState.Checked or Qt.CheckState.Unchecked).
+            mod (str): Name of the mod whose state changed.
+            var (QCheckBox): Checkbox associated with the mod.
             mod_vars (list): List of (mod_name, QCheckBox) tuples for all mods.
             dependencies (dict): Dependency mapping of mods.
         """
-
-        # Create a quick lookup dictionary for mod checkboxes
         mod_dict = {mod_name: mod_var for mod_name, mod_var, *_ in mod_vars}
 
         def include_required_mods(dependent_mod):
             """Include mods that are required by the dependent mod."""
-            required_mods = dependencies.get(dependent_mod, [])
-            for required_mod in required_mods:
+            for required_mod in dependencies.get(dependent_mod, []):
                 required_var = mod_dict.get(required_mod)
                 if required_var and not required_var.isChecked():
-                    # Include the required mod
-                    required_var.blockSignals(True)  # Prevent triggering signals recursively
+                    required_var.blockSignals(True)
                     required_var.setChecked(True)
                     required_var.blockSignals(False)
-                    # Recursively handle further dependencies
                     include_required_mods(required_mod)
 
         def exclude_dependent_mods(required_mod):
@@ -2771,17 +2781,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 if required_mod in required_mods:
                     dependent_var = mod_dict.get(dependent_mod)
                     if dependent_var and dependent_var.isChecked():
-                        # Exclude the dependent mod
                         dependent_var.blockSignals(True)
                         dependent_var.setChecked(False)
                         dependent_var.blockSignals(False)
-                        # Recursively handle further dependencies
                         exclude_dependent_mods(dependent_mod)
 
-        # Main logic based on the checkbox state
-        if var.isChecked():  # Include the mod
+        if state == Qt.CheckState.Checked:
             include_required_mods(mod)
-        else:  # Exclude the mod
+        else:
             exclude_dependent_mods(mod)
 
     def save_preferences(self, mod_vars):
