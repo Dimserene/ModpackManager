@@ -706,8 +706,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             if reply == QMessageBox.StandardButton.Yes:
                 self.download_and_replace_manager(download_url)
-        else:
-            QMessageBox.information(self, "Up to Date", "Your Modpack Manager is already up to date.")
 
     def download_and_replace_manager(self, download_url):
         try:
@@ -724,9 +722,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             total_size = int(response.headers.get('content-length', 0))
             downloaded_size = 0
 
-            current_exe_path = os.path.abspath(sys.argv[0])  # Current running executable
+            current_exe_path = os.path.abspath(sys.argv[0])  # Path to the currently running executable
             updated_exe_path = current_exe_path + ".new"
 
+            # Download the new executable
             with open(updated_exe_path, "wb") as file:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
@@ -745,13 +744,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             progress_dialog.setValue(100)  # Ensure progress bar is full upon completion
 
-            # Replace the current executable
-            backup_path = current_exe_path + ".backup"
-            shutil.move(current_exe_path, backup_path)
-            shutil.move(updated_exe_path, current_exe_path)
-
-            QMessageBox.information(self, "Update Complete", "The Modpack Manager was updated successfully. Please restart the application.")
-            sys.exit(0)  # Exit after update
+            # Launch the new executable and exit the current one
+            subprocess.Popen([updated_exe_path])  # Launch the new executable
+            sys.exit(0)  # Terminate the current process
         except Exception as e:
             QMessageBox.critical(self, "Update Failed", f"An error occurred while updating: {e}")
             if os.path.exists(updated_exe_path):
