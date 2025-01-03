@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.2",
+  "latest_version": "1.6.3",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "Fixed excluded mods not loaded in when selecting mods",
+  "changelog": "Fixed quick update functionality (Finally).",
   "modpack_categories": [
     {
       "category": "Dimserene",
