@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.3",
+  "latest_version": "1.6.4",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "Fixed quick update functionality (Finally).",
+  "changelog": "- Changed behavior: now the manager will update itself after user confirmation.\n- Fixed dependencies (again).\n- Dependencies is now no longer hardcoded.",
 
   "dependencies": {
     "Cryptid": ["Talisman"],
