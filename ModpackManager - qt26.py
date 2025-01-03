@@ -43,9 +43,9 @@ SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 FAVORITES_FILE = "favorites.json"
 
-DATE = "2025/01/03"
+DATE = "2025/01/04"
 ITERATION = "26"
-VERSION = "1.6.6"
+VERSION = "1.6.7"
 
 def set_git_buffer_size():
     try:
@@ -279,33 +279,46 @@ class ModpackDownloadWorker(QThread):
 
 def update_submodules(repo):
     """
-    Update submodules of a given repository, handling additions or removals.
+    Update submodules of a given repository, handling additions and removals.
 
     Args:
         repo (Repo): The GitPython Repo object representing the repository.
     """
     try:
-        print("Initializing and updating submodules...")
-        repo.git.submodule('sync')  # Sync submodule configuration
-        repo.git.submodule('init')  # Initialize new submodules
-        repo.git.submodule('update', '--recursive', '--remote')  # Update all submodules recursively
-
-        # Handle removed submodules
-        print("Checking for removed submodules...")
-        submodules_path = os.path.join(repo.working_tree_dir, '.gitmodules')
-        if os.path.exists(submodules_path):
-            repo.git.rm('--cached', '-f', submodules_path)
-            print("Removed stale submodules from .gitmodules.")
-        
-        # Reinitialize submodules after changes
+        print("Synchronizing submodules...")
+        # Synchronize submodule URLs with the main repository
         repo.git.submodule('sync')
+
+        print("Initializing new submodules...")
+        # Initialize any newly added submodules
+        repo.git.submodule('init')
+
+        print("Updating submodules recursively...")
+        # Update all submodules recursively and fetch the latest changes
+        repo.git.submodule('update', '--recursive', '--remote')
+
+        submodules_path = os.path.join(repo.working_tree_dir, '.gitmodules')
+        if not os.path.exists(submodules_path):
+            print(".gitmodules file not found. Skipping removal of stale submodules.")
+            return
+
+        print("Removing stale submodules...")
+        # Clean up stale submodules from .gitmodules
+        repo.git.submodule('deinit', '--all', '--force')
+        repo.git.rm('--cached', '-r', '--ignore-unmatch', submodules_path)
+
+        print("Re-initializing submodules after cleanup...")
         repo.git.submodule('init')
         repo.git.submodule('update', '--recursive', '--remote')
 
         print("Submodules updated successfully.")
     except GitCommandError as e:
-        print(f"Failed to update submodules: {str(e)}")
+        print(f"Git command error: {e}")
         raise
+    except Exception as e:
+        print(f"Unexpected error during submodule update: {e}")
+        raise
+
 
 class ModpackUpdateWorker(QThread):
     finished = pyqtSignal(bool, str)
@@ -691,67 +704,29 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         super(ModpackManagerApp, self).closeEvent(event)
 
     def check_for_updates(self):
+        # Fetch the latest version and download URL from modpack_data
         latest_version = self.modpack_data.get('latest_version')
         download_url = self.modpack_data.get('download_url')
         changelog = self.modpack_data.get('changelog')
 
-        # Compare versions using semantic versioning
-        if version.parse(VERSION) < version.parse(latest_version):
-            reply = QMessageBox.question(
-                self,
-                "Update Available",
-                f"A new version ({latest_version}) is available.\nChangelog:\n{changelog}\n\nWould you like to download and install the update?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
+        # Compare with the current version
+        if VERSION != latest_version:
+            # An update is available
+            self.prompt_update(latest_version, download_url, changelog)
 
-            if reply == QMessageBox.StandardButton.Yes:
-                self.download_and_replace_manager(download_url)
+    def prompt_update(self, latest_version, download_url, changelog):
+        # Display the update prompt with "Ok" and "Cancel" buttons
+        reply = QMessageBox.question(
+            self,
+            "Update Available",
+            f"A new version ({latest_version}) is available.\nChangelog:\n{changelog}\n\nWould you like to download it from the official website?",
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+        )
 
-    def download_and_replace_manager(self, download_url):
-        try:
-            # Initialize progress dialog
-            progress_dialog = QProgressDialog("Updating Manager...", "Cancel", 0, 100, self)
-            progress_dialog.setWindowTitle("Updating Manager")
-            progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
-            progress_dialog.setValue(0)
-            progress_dialog.show()
-
-            response = requests.get(download_url, stream=True)
-            response.raise_for_status()
-
-            total_size = int(response.headers.get('content-length', 0))
-            downloaded_size = 0
-
-            current_exe_path = os.path.abspath(sys.argv[0])  # Path to the currently running executable
-            updated_exe_path = current_exe_path + ".new"
-
-            # Download the new executable
-            with open(updated_exe_path, "wb") as file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        file.write(chunk)
-                        downloaded_size += len(chunk)
-
-                        # Update progress bar
-                        if total_size > 0:
-                            progress = int((downloaded_size / total_size) * 100)
-                            progress_dialog.setValue(progress)
-                            QApplication.processEvents()
-
-                        # Handle cancel operation
-                        if progress_dialog.wasCanceled():
-                            raise Exception("Update canceled by the user.")
-
-            progress_dialog.setValue(100)  # Ensure progress bar is full upon completion
-
-            # Launch the new executable and exit the current one
-            subprocess.Popen([updated_exe_path])  # Launch the new executable
-            sys.exit(0)  # Terminate the current process
-        except Exception as e:
-            QMessageBox.critical(self, "Update Failed", f"An error occurred while updating: {e}")
-            if os.path.exists(updated_exe_path):
-                os.remove(updated_exe_path)  # Clean up the partially downloaded file
-
+        # Open the download URL only if the user clicked "Ok"
+        if reply == QMessageBox.StandardButton.Ok:
+            webbrowser.open(download_url)
+                
     def apply_modpack_styles(self, modpack_name):
         """Apply styles to UI elements based on the selected modpack"""
         if modpack_name == "Coonie's Modpack":
