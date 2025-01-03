@@ -4,6 +4,7 @@ from PyQt6.QtGui import QColor, QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer, QProcess, QThread, pyqtSignal, QPoint
 from PyQt6.QtWidgets import QMenu, QSplitter, QListWidgetItem, QScrollArea, QFrame, QProgressDialog, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
 from git import Repo, GitCommandError
+from packaging import version
 import pandas as pd
 
 ############################################################
@@ -74,8 +75,6 @@ def fetch_modpack_data(url):
 
 modpack_data = fetch_modpack_data(url)
 
-import requests
-
 def fetch_dependencies(url):
     """
     Fetch dependencies from the `information.json` file.
@@ -92,9 +91,6 @@ def fetch_dependencies(url):
         response.raise_for_status()
         data = response.json()
 
-        # Print the fetched JSON to verify structure
-        print("Fetched JSON:", data)
-
         # Extract dependencies
         dependencies = data.get("dependencies", {})
         print("Dependencies fetched successfully:", dependencies)
@@ -102,7 +98,8 @@ def fetch_dependencies(url):
     except requests.RequestException as e:
         print(f"Failed to fetch dependencies: {e}")
         return {}
-
+    
+dependencies = fetch_dependencies(url)
 
 # URL to the public Google Sheet (export as CSV format)
 sheet_url = "https://docs.google.com/spreadsheets/d/1L2wPG5mNI-ZBSW_ta__L9EcfAw-arKrXXVD-43eU4og/export?format=csv&gid=510782711"
@@ -293,14 +290,14 @@ def update_submodules(repo):
         repo.git.submodule('init')  # Initialize new submodules
         repo.git.submodule('update', '--recursive', '--remote')  # Update all submodules recursively
 
-        # Handle removed submodules only if .gitmodules exists
+        # Handle removed submodules
+        print("Checking for removed submodules...")
         submodules_path = os.path.join(repo.working_tree_dir, '.gitmodules')
         if os.path.exists(submodules_path):
-            print("Checking for removed submodules...")
-            repo.git.rm('--cached', '-f', '.gitmodules')
+            repo.git.rm('--cached', '-f', submodules_path)
             print("Removed stale submodules from .gitmodules.")
         
-        # Reinitialize submodules after potential changes
+        # Reinitialize submodules after changes
         repo.git.submodule('sync')
         repo.git.submodule('init')
         repo.git.submodule('update', '--recursive', '--remote')
@@ -309,7 +306,6 @@ def update_submodules(repo):
     except GitCommandError as e:
         print(f"Failed to update submodules: {str(e)}")
         raise
-
 
 class ModpackUpdateWorker(QThread):
     finished = pyqtSignal(bool, str)
@@ -695,28 +691,48 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         super(ModpackManagerApp, self).closeEvent(event)
 
     def check_for_updates(self):
-        # Fetch the latest version and download URL from modpack_data
         latest_version = self.modpack_data.get('latest_version')
         download_url = self.modpack_data.get('download_url')
         changelog = self.modpack_data.get('changelog')
 
-        # Compare with the current version
-        if VERSION != latest_version:
-            # An update is available
-            self.prompt_update(latest_version, download_url, changelog)
+        # Compare current and latest versions using semantic versioning
+        if version.parse(VERSION) < version.parse(latest_version):
+            reply = QMessageBox.question(
+                self,
+                "Update Available",
+                f"A new version ({latest_version}) is available.\nChangelog:\n{changelog}\n\nWould you like to download and install the update?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
 
-    def prompt_update(self, latest_version, download_url, changelog):
-        # Display the update prompt with "Ok" and "Cancel" buttons
-        reply = QMessageBox.question(
-            self,
-            "Update Available",
-            f"A new version ({latest_version}) is available.\nChangelog:\n{changelog}\n\nWould you like to download it from the official website?",
-            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
-        )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.download_and_replace_exe(download_url)
 
-        # Open the download URL only if the user clicked "Ok"
-        if reply == QMessageBox.StandardButton.Ok:
-            webbrowser.open(download_url)
+    def download_and_replace_exe(self, download_url):
+        try:
+            # Notify user about the download process
+            QMessageBox.information(self, "Download Update", "Downloading the latest update. Please wait...")
+
+            response = requests.get(download_url, stream=True)
+            response.raise_for_status()
+
+            exe_path = os.path.join(self.game_dir, "balatro_updated.exe")
+            with open(exe_path, "wb") as file:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        file.write(chunk)
+
+            old_exe_path = os.path.join(self.game_dir, "balatro.exe")
+
+            # Backup the old executable
+            backup_path = old_exe_path + ".backup"
+            shutil.move(old_exe_path, backup_path)
+
+            # Replace with the new executable
+            shutil.move(exe_path, old_exe_path)
+
+            QMessageBox.information(self, "Update Complete", "The update was installed successfully. You can now launch the game.")
+        except Exception as e:
+            QMessageBox.critical(self, "Update Failed", f"An error occurred while updating: {e}")
 
 
     def apply_modpack_styles(self, modpack_name):
@@ -2471,7 +2487,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 self.install_mods(None)  # Pass None as we don't have a popup
             else:
                 # Show mod selection popup
-                self.popup_mod_selection(mod_list)
+                self.popup_mod_selection(mod_list, dependencies)
 
         except Exception as e:
             msg_box = QMessageBox()
@@ -2491,8 +2507,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.exec()
             return []
         
-    def popup_mod_selection(self, mod_list):
-        dependencies = fetch_dependencies(url)
+    def popup_mod_selection(self, mod_list, dependencies):
+
         # Add mods to the right panel
         always_installed = {"Steamodded", "ModpackUtil"}  # Mods that are always installed and not displayed
 
@@ -2664,7 +2680,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             # Connect state change event for dependency handling
             mod_checkbox.stateChanged.connect(
-                lambda state, mod_name=mod, mod_var=mod_checkbox: self.handle_dependencies(state, mod_name, mod_var, mod_vars, dependencies)
+                lambda state, mod_name=mod, mod_var=mod_checkbox: self.handle_dependencies(mod_name, mod_var, mod_vars, dependencies)
             )
 
 
@@ -2752,44 +2768,52 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         popup.finished.connect(on_close)
         popup.exec()
 
-    def handle_dependencies(self, state, mod, var, mod_vars, dependencies):
+    def handle_dependencies(self, mod, var, mod_vars, dependencies):
         """
         Handle mod dependencies when a checkbox is clicked (checked = included).
 
         Args:
-            state (int): State of the checkbox (Qt.CheckState.Checked or Qt.CheckState.Unchecked).
-            mod (str): Name of the mod whose state changed.
-            var (QCheckBox): Checkbox associated with the mod.
-            mod_vars (list): List of (mod_name, QCheckBox) tuples for all mods.
+            mod (str): The name of the mod whose state changed.
+            var (QCheckBox): The checkbox associated with the mod.
+            mod_vars (list): List of (mod_row_container, mod_name, QCheckBox, star_label) tuples for all mods.
             dependencies (dict): Dependency mapping of mods.
         """
-        mod_dict = {mod_name: mod_var for mod_name, mod_var, *_ in mod_vars}
 
-        def include_required_mods(dependent_mod):
-            """Include mods that are required by the dependent mod."""
-            for required_mod in dependencies.get(dependent_mod, []):
+        # Create a quick lookup dictionary for mod checkboxes
+        mod_dict = {mod_name: mod_var for _, mod_name, mod_var, _ in mod_vars}
+
+        def include_dependencies(dependent_mod):
+            """Include all mods that are dependencies for the current mod."""
+            required_mods = dependencies.get(dependent_mod, [])
+            for required_mod in required_mods:
                 required_var = mod_dict.get(required_mod)
                 if required_var and not required_var.isChecked():
-                    required_var.blockSignals(True)
+                    # Select the required mod
+                    required_var.blockSignals(True)  # Prevent recursive signal triggering
                     required_var.setChecked(True)
                     required_var.blockSignals(False)
-                    include_required_mods(required_mod)
+                    # Recursively include dependencies of the required mod
+                    include_dependencies(required_mod)
 
-        def exclude_dependent_mods(required_mod):
-            """Exclude mods that depend on the required mod."""
+        def exclude_dependents(required_mod):
+            """Exclude all mods that depend on the current mod."""
             for dependent_mod, required_mods in dependencies.items():
                 if required_mod in required_mods:
                     dependent_var = mod_dict.get(dependent_mod)
                     if dependent_var and dependent_var.isChecked():
+                        # Deselect the dependent mod
                         dependent_var.blockSignals(True)
                         dependent_var.setChecked(False)
                         dependent_var.blockSignals(False)
-                        exclude_dependent_mods(dependent_mod)
+                        # Recursively exclude dependents of this mod
+                        exclude_dependents(dependent_mod)
 
-        if state == Qt.CheckState.Checked:
-            include_required_mods(mod)
-        else:
-            exclude_dependent_mods(mod)
+        # Main logic based on the checkbox state
+        if var.isChecked():  # If the mod is being selected
+            include_dependencies(mod)
+        else:  # If the mod is being deselected
+            exclude_dependents(mod)
+
 
     def save_preferences(self, mod_vars):
         # Collect mods that are unchecked (excluded from installation)
