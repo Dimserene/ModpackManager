@@ -1,5 +1,5 @@
 {
-  "latest_version": "1.6.5",
+  "latest_version": "1.6.6",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
   "changelog": "- Changed behavior: now the manager will update itself after user confirmation.\n- Fixed dependencies (again).\n- Dependencies is now no longer hardcoded.",
 

@@ -45,7 +45,7 @@ FAVORITES_FILE = "favorites.json"
 
 DATE = "2025/01/03"
 ITERATION = "26"
-VERSION = "1.6.5"
+VERSION = "1.6.6"
 
 def set_git_buffer_size():
     try:
@@ -709,17 +709,37 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def download_and_replace_exe(self, download_url):
         try:
+            # Initialize progress dialog
+            progress_dialog = QProgressDialog("Updating Manager...", "Cancel", 0, 100, self)
+            progress_dialog.setWindowTitle("Updating Manager")
+            progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+            progress_dialog.setValue(0)
+            progress_dialog.show()
+
             # Notify user about the download process
             QMessageBox.information(self, "Download Update", "Downloading the latest update. Please wait...")
 
             response = requests.get(download_url, stream=True)
             response.raise_for_status()
 
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded_size = 0
+
             exe_path = os.path.join(self.game_dir, "balatro_updated.exe")
             with open(exe_path, "wb") as file:
-                for chunk in response.iter_content(chunk_size=1024):
+                for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         file.write(chunk)
+                        downloaded_size += len(chunk)
+                        # Update progress bar
+                        if total_size > 0:
+                            progress = int((downloaded_size / total_size) * 100)
+                            progress_dialog.setValue(progress)
+                            QApplication.processEvents()  # Keep the UI responsive
+
+                    # Allow the user to cancel the operation
+                    if progress_dialog.wasCanceled():
+                        raise Exception("Update canceled by the user.")
 
             old_exe_path = os.path.join(self.game_dir, "balatro.exe")
 
@@ -730,10 +750,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             # Replace with the new executable
             shutil.move(exe_path, old_exe_path)
 
+            progress_dialog.setValue(100)  # Ensure progress bar is full upon completion
             QMessageBox.information(self, "Update Complete", "The update was installed successfully. You can now launch the game.")
         except Exception as e:
             QMessageBox.critical(self, "Update Failed", f"An error occurred while updating: {e}")
-
 
     def apply_modpack_styles(self, modpack_name):
         """Apply styles to UI elements based on the selected modpack"""
