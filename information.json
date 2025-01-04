@@ -45,9 +45,9 @@
           "description": "A harsh and unforgiving modpack for experienced players."
         },
         {
-          "name": "Taquin-Paquet",
-          "url": "https://github.com/Dimserene/Taquin-Paquet.git",
-          "description": "A meme modpack designed for fun and laughter."
+          "name": "Experimental-Pack",
+          "url": "https://github.com/Dimserene/Experimental-Pack.git",
+          "description": "Contains relatively new mods, for fresh new features and concepts."
         }
       ]
     },
