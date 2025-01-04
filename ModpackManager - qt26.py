@@ -286,28 +286,33 @@ def update_submodules(repo):
     """
     try:
         print("Synchronizing submodules...")
-        # Synchronize submodule URLs with the main repository
-        repo.git.submodule('sync')
+        repo.git.submodule('sync')  # Sync submodule URLs
 
         print("Initializing new submodules...")
-        # Initialize any newly added submodules
-        repo.git.submodule('init')
+        repo.git.submodule('init')  # Initialize new submodules
 
         print("Updating submodules recursively...")
-        # Update all submodules recursively and fetch the latest changes
-        repo.git.submodule('update', '--recursive', '--remote')
+        repo.git.submodule('update', '--recursive', '--remote')  # Update submodules
 
         submodules_path = os.path.join(repo.working_tree_dir, '.gitmodules')
         if not os.path.exists(submodules_path):
-            print(".gitmodules file not found. Skipping removal of stale submodules.")
+            print(".gitmodules file not found. Skipping stale submodule cleanup.")
             return
 
-        print("Removing stale submodules...")
-        # Clean up stale submodules from .gitmodules
+        print("Cleaning up stale submodules...")
+        # Deinit stale submodules
         repo.git.submodule('deinit', '--all', '--force')
-        repo.git.rm('--cached', '-r', '--ignore-unmatch', submodules_path)
 
-        print("Re-initializing submodules after cleanup...")
+        # Remove cached and stale submodules
+        repo.git.rm('--cached', '-r', '--ignore-unmatch', submodules_path)
+        stale_paths = [
+            os.path.join(repo.working_tree_dir, submodule.path) for submodule in repo.submodules
+        ]
+        for path in stale_paths:
+            if os.path.exists(path):
+                shutil.rmtree(path, ignore_errors=True)
+
+        print("Re-initializing submodules...")
         repo.git.submodule('init')
         repo.git.submodule('update', '--recursive', '--remote')
 
@@ -319,9 +324,9 @@ def update_submodules(repo):
         print(f"Unexpected error during submodule update: {e}")
         raise
 
-
 class ModpackUpdateWorker(QThread):
-    finished = pyqtSignal(bool, str)
+    finished = pyqtSignal(bool, str)  # Signal to indicate task completion with success status and message
+    progress = pyqtSignal(str)       # Signal to report progress to the GUI
 
     def __init__(self, repo_path):
         super().__init__()
@@ -335,19 +340,27 @@ class ModpackUpdateWorker(QThread):
 
             repo = Repo(self.repo_path)
 
-            # Pull the latest changes
-            print("Pulling latest changes...")
+            # Handle uncommitted changes
+            try:
+                if repo.is_dirty(untracked_files=True):
+                    self.progress.emit("Uncommitted changes detected. Resetting and cleaning repository...")
+                    repo.git.reset('--hard')  # Discard local changes
+                    repo.git.clean('-fd')     # Remove untracked files and directories
+            except GitCommandError as e:
+                self.finished.emit(False, f"Error resetting repository: {str(e)}")
+                return
+
+            self.progress.emit("Pulling latest changes...")
             repo.remotes.origin.pull()
 
-            # Update submodules, including handling additions and removals
+            self.progress.emit("Updating submodules...")
             update_submodules(repo)
 
             self.finished.emit(True, "Modpack and submodules updated successfully.")
         except GitCommandError as e:
             self.finished.emit(False, f"Git error: {str(e)}")
         except Exception as e:
-            self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
-
+            self.finished.emit(False, f"Unexpected error: {str(e)}")
 
 class MultiModpackWorker(QThread):
     progress = pyqtSignal(int)

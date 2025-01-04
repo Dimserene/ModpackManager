@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.7",
+  "latest_version": "1.6.8",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Bug fixes.",
+  "changelog": "- Fixed quick update module kept erroring out.",
   "dependencies": {
     "AntonosStakes": ["Talisman"],
     "Bmjokers": ["Bmwallet"],
