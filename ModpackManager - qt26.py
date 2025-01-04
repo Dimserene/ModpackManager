@@ -45,7 +45,7 @@ FAVORITES_FILE = "favorites.json"
 
 DATE = "2025/01/04"
 ITERATION = "26"
-VERSION = "1.6.7"
+VERSION = "1.6.8"
 
 def set_git_buffer_size():
     try:
