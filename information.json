@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.7",
+  "latest_version": "1.6.8",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Fixed dependencies (again).\n- Dependencies is now no longer hardcoded.\n- Bug fixes (hopefully).",
+  "changelog": "- Bug fixes.",
 
   "dependencies": {
     "AntonosStakes": ["Talisman"],

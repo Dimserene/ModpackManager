@@ -45,7 +45,7 @@ FAVORITES_FILE = "favorites.json"
 
 DATE = "2025/01/04"
 ITERATION = "26"
-VERSION = "1.6.7"
+VERSION = "1.6.8"
 
 def set_git_buffer_size():
     try:
@@ -279,23 +279,25 @@ class ModpackDownloadWorker(QThread):
 
 def update_submodules(repo):
     """
-    Update submodules of a given repository, handling additions and removals.
+    Update submodules of a given repository, handling additions, removals, and local changes.
 
     Args:
         repo (Repo): The GitPython Repo object representing the repository.
     """
     try:
+        # Check for local changes
+        if repo.is_dirty(untracked_files=True):
+            print("Local changes detected. Stashing changes...")
+            repo.git.stash('save')
+
         print("Synchronizing submodules...")
-        # Synchronize submodule URLs with the main repository
-        repo.git.submodule('sync')
+        repo.git.submodule('sync')  # Sync submodule configuration
 
         print("Initializing new submodules...")
-        # Initialize any newly added submodules
-        repo.git.submodule('init')
+        repo.git.submodule('init')  # Initialize new submodules
 
         print("Updating submodules recursively...")
-        # Update all submodules recursively and fetch the latest changes
-        repo.git.submodule('update', '--recursive', '--remote')
+        repo.git.submodule('update', '--recursive', '--remote')  # Update all submodules recursively
 
         submodules_path = os.path.join(repo.working_tree_dir, '.gitmodules')
         if not os.path.exists(submodules_path):
@@ -303,7 +305,6 @@ def update_submodules(repo):
             return
 
         print("Removing stale submodules...")
-        # Clean up stale submodules from .gitmodules
         repo.git.submodule('deinit', '--all', '--force')
         repo.git.rm('--cached', '-r', '--ignore-unmatch', submodules_path)
 
@@ -312,13 +313,18 @@ def update_submodules(repo):
         repo.git.submodule('update', '--recursive', '--remote')
 
         print("Submodules updated successfully.")
+
+        # Reapply stashed changes if any
+        if repo.git.stash('list'):
+            print("Reapplying stashed changes...")
+            repo.git.stash('pop')
+
     except GitCommandError as e:
         print(f"Git command error: {e}")
         raise
     except Exception as e:
         print(f"Unexpected error during submodule update: {e}")
         raise
-
 
 class ModpackUpdateWorker(QThread):
     finished = pyqtSignal(bool, str)
