@@ -4,19 +4,20 @@
   "changelog": "- Fixed dependencies (again).\n- Dependencies is now no longer hardcoded.\n- Bug fixes (hopefully).",
 
   "dependencies": {
-    "Cryptid": ["Talisman"],
-    "ModpackDecks": ["SDM_0-s-Stuff"],
-    "Jestobiology": ["Fusion-Jokers"],
-    "Vultbines_Joker": ["Fusion-Jokers"],
-    "Tsunami": ["Fusion-Jokers"],
     "AntonosStakes": ["Talisman"],
     "Bmjokers": ["Bmwallet"],
-    "Oiiman-s-Additions": ["Cryptid", "Talisman"],
-    "TatteredDecks": ["Galdur"],
-    "TOGAPackBalatro": ["Talisman"],
-    "MoreFluff": ["Talisman"],
+    "Cryptid": ["Talisman"],
+    "Familiar": ["Talisman"],
+    "Gemstones": ["Talisman"],
+    "Jestobiology": ["Fusion-Jokers"],
     "JoJokers": ["Talisman"],
-    "Gemstones": ["Talisman"]
+    "ModpackDecks": ["SDM_0-s-Stuff"],
+    "MoreFluff": ["Talisman"],
+    "Oiiman-s-Additions": ["Cryptid", "Talisman"],
+    "TOGAPackBalatro": ["Talisman"],
+    "TatteredDecks": ["Galdur"],
+    "Tsunami": ["Fusion-Jokers"],
+    "Vultbines_Joker": ["Fusion-Jokers"]
   },
 
   "modpack_categories": [
