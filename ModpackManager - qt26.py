@@ -43,9 +43,9 @@ SETTINGS_FILE = "user_settings.json"
 INSTALL_FILE = "excluded_mods.json" 
 FAVORITES_FILE = "favorites.json"
 
-DATE = "2025/01/04"
+DATE = "2025/01/05"
 ITERATION = "26"
-VERSION = "1.6.8"
+VERSION = "1.6.9"
 
 def set_git_buffer_size():
     try:
@@ -2740,7 +2740,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         save_button = QPushButton("Save & Install", popup)
 
         clear_button.clicked.connect(lambda: [checkbox.setChecked(False) for _, _, checkbox, _ in mod_vars])
-        reverse_button.clicked.connect(lambda: [checkbox.setChecked(not checkbox.isChecked()) for _, _, checkbox, _ in mod_vars])
+        reverse_button.clicked.connect(lambda: self.reverse_select_with_dependencies(mod_vars, dependencies))
         feel_lucky_button.clicked.connect(lambda: [checkbox.setChecked(random.choice([True, False])) for _, _, checkbox, _ in mod_vars])
         save_button.clicked.connect(lambda: self.save_and_install([(mod, checkbox) for _, mod, checkbox, _ in mod_vars], popup))
 
@@ -2775,50 +2775,59 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def handle_dependencies(self, mod, var, mod_vars, dependencies):
         """
-        Handle mod dependencies when a checkbox is clicked (checked = included).
-
+        Handle mod dependencies when a checkbox state changes.
         Args:
-            mod (str): The name of the mod whose state changed.
+            mod (str): The mod whose state changed.
             var (QCheckBox): The checkbox associated with the mod.
-            mod_vars (list): List of (mod_row_container, mod_name, QCheckBox, star_label) tuples for all mods.
+            mod_vars (list): List of (mod_row_container, mod_name, QCheckBox, star_label).
             dependencies (dict): Dependency mapping of mods.
         """
+        mod_dict = {mod_name: (mod_var, mod_row_container) for mod_row_container, mod_name, mod_var, _ in mod_vars}
 
-        # Create a quick lookup dictionary for mod checkboxes
-        mod_dict = {mod_name: mod_var for _, mod_name, mod_var, _ in mod_vars}
-
-        def include_dependencies(dependent_mod):
-            """Include all mods that are dependencies for the current mod."""
+        def include_required_mods(dependent_mod):
             required_mods = dependencies.get(dependent_mod, [])
             for required_mod in required_mods:
-                required_var = mod_dict.get(required_mod)
-                if required_var and not required_var.isChecked():
-                    # Select the required mod
-                    required_var.blockSignals(True)  # Prevent recursive signal triggering
+                required_var, required_container = mod_dict.get(required_mod, (None, None))
+                if required_var and not required_var.isChecked() and required_container.isVisible():
+                    required_var.blockSignals(True)
                     required_var.setChecked(True)
                     required_var.blockSignals(False)
-                    # Recursively include dependencies of the required mod
-                    include_dependencies(required_mod)
+                    include_required_mods(required_mod)
 
-        def exclude_dependents(required_mod):
-            """Exclude all mods that depend on the current mod."""
+        def exclude_dependent_mods(required_mod):
             for dependent_mod, required_mods in dependencies.items():
                 if required_mod in required_mods:
-                    dependent_var = mod_dict.get(dependent_mod)
-                    if dependent_var and dependent_var.isChecked():
-                        # Deselect the dependent mod
+                    dependent_var, dependent_container = mod_dict.get(dependent_mod, (None, None))
+                    if dependent_var and dependent_var.isChecked() and dependent_container.isVisible():
                         dependent_var.blockSignals(True)
                         dependent_var.setChecked(False)
                         dependent_var.blockSignals(False)
-                        # Recursively exclude dependents of this mod
-                        exclude_dependents(dependent_mod)
+                        exclude_dependent_mods(dependent_mod)
 
-        # Main logic based on the checkbox state
-        if var.isChecked():  # If the mod is being selected
-            include_dependencies(mod)
-        else:  # If the mod is being deselected
-            exclude_dependents(mod)
+        if var.isChecked():  # Include the mod
+            include_required_mods(mod)
+        else:  # Exclude the mod
+            exclude_dependent_mods(mod)
 
+
+    def reverse_select_with_dependencies(self, mod_vars, dependencies):
+        """
+        Reverse the checked state of visible mods and process dependencies afterward.
+        Args:
+            mod_vars (list): List of (mod_row_container, mod_name, QCheckBox, star_label).
+            dependencies (dict): Dependency mapping of mods.
+        """
+        # Step 1: Flip the checked state of all visible mods
+        for mod_row_container, mod_name, checkbox, _ in mod_vars:
+            if mod_row_container.isVisible():
+                checkbox.blockSignals(True)  # Prevent triggering dependency logic during the flip
+                checkbox.setChecked(not checkbox.isChecked())
+                checkbox.blockSignals(False)
+
+        # Step 2: Process dependencies for all visible mods based on their new state
+        for mod_row_container, mod_name, checkbox, _ in mod_vars:
+            if mod_row_container.isVisible():
+                self.handle_dependencies(mod_name, checkbox, mod_vars, dependencies)
 
     def save_preferences(self, mod_vars):
         # Collect mods that are unchecked (excluded from installation)

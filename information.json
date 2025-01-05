@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.8",
+  "latest_version": "1.6.9",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Fixed quick update module kept erroring out.",
+  "changelog": "- Fixed reverse select button not reversing depended mods.",
   "dependencies": {
     "AntonosStakes": ["Talisman"],
     "Bmjokers": ["Bmwallet"],
