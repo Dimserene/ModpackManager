@@ -2893,7 +2893,11 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             QMessageBox.critical(self, "Error", f"Failed to reset favorite mods file. Error: {e}")
 
     def install_mods(self, popup):
-
+        """
+        Install mods with a progress bar showing the current mod being copied.
+        Args:
+            popup (QDialog): The mod selection popup (optional).
+        """
         # Read excluded mods
         excluded_mods = self.read_preferences()
         modpack_name = self.modpack_var.currentText()
@@ -2910,29 +2914,23 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Check if the Mods directory exists and warn the user
         if os.path.isdir(self.mods_dir):
-
-            # Determine if the user has opted to backup mods
+            # Backup existing mods folder if enabled
             backup_mods = self.settings.get("backup_mods", False)
-            if hasattr(self, 'backup_checkbox'):  # Use the checkbox from the popup_mod_selection dialog if present
+            if hasattr(self, 'backup_checkbox'):  # Use checkbox if available
                 backup_mods = self.backup_checkbox.isChecked()
 
             if backup_mods:
-                # Create backup of the current Mods folder
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
                 backup_folder = os.path.join(os.path.dirname(self.mods_dir), f"Mods-backup-{timestamp}")
                 try:
                     shutil.move(self.mods_dir, backup_folder)
                 except Exception as e:
-                    msg_box = QMessageBox()
-                    msg_box.setIcon(QMessageBox.Icon.Critical)
-                    msg_box.setWindowTitle("Error")
-                    msg_box.setText(f"Failed to backup Mods folder. Error: {e}")
-                    msg_box.exec()
+                    QMessageBox.critical(self, "Error", f"Failed to backup Mods folder. Error: {e}")
                     return
 
-            # Determine if the user has opted to remove mods
+            # Remove existing mods folder if enabled
             remove_mods = self.settings.get("remove_mods", False)
-            if hasattr(self, 'remove_checkbox'):  # Use the checkbox from the popup_mod_selection dialog if present
+            if hasattr(self, 'remove_checkbox'):  # Use checkbox if available
                 remove_mods = self.remove_checkbox.isChecked()
 
             if remove_mods:
@@ -2942,67 +2940,69 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.setText("The current 'Mods' folder will be erased. Do you want to proceed?")
                 msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
                 response = msg_box.exec()
-
                 if response == QMessageBox.StandardButton.No:
-                    return  # User canceled the installation
-                
-                # Remove the existing Mods folder
+                    return
                 try:
                     shutil.rmtree(self.mods_dir, ignore_errors=True)
                 except Exception as e:
-                    msg_box = QMessageBox()
-                    msg_box.setIcon(QMessageBox.Icon.Critical)
-                    msg_box.setWindowTitle("Error")
-                    msg_box.setText(f"Failed to remove Mods folder. Error: {e}")
-                    msg_box.exec()
+                    QMessageBox.critical(self, "Error", f"Failed to remove Mods folder. Error: {e}")
                     return
 
         # Ensure the install directory exists
         if not os.path.exists(self.mods_dir):
             os.makedirs(self.mods_dir)
 
+        # Create a progress dialog
+        progress_dialog = QProgressDialog("Installing mods...", "Cancel", 0, 100, self)
+        progress_dialog.setWindowTitle("Installation Progress")
+        progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        progress_dialog.setMinimumDuration(0)
+        progress_dialog.setValue(0)
+
         # Always install "Steamodded" and "ModpackUtil"
         mandatory_mods = {"Steamodded", "ModpackUtil"}
-        for mod in mandatory_mods:
-            source_mod_path = os.path.join(mods_src, mod)
-            destination_mod_path = os.path.join(self.mods_dir, mod)
-            
-            try:
-                if os.path.exists(destination_mod_path):
-                    shutil.rmtree(destination_mod_path)  # Remove old version of the mod if it exists
-                shutil.copytree(source_mod_path, destination_mod_path)
-            except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to install mandatory mod: {mod}. Error: {e}")
-                return
+        all_mods = mandatory_mods.union(set(os.listdir(mods_src)))
+        filtered_mods = [mod for mod in all_mods if mod not in excluded_mods or mod in mandatory_mods]
 
-        # Install all mods except excluded ones
-        for mod in os.listdir(mods_src):
-            if mod not in excluded_mods:
-                print(f"Installing mod: {mod}")
+        try:
+            # Iterate through mods and copy them
+            total_mods = len(filtered_mods)
+            for index, mod in enumerate(filtered_mods, start=1):
                 source_mod_path = os.path.join(mods_src, mod)
                 destination_mod_path = os.path.join(self.mods_dir, mod)
-                try:
-                    if os.path.exists(destination_mod_path):
-                        shutil.rmtree(destination_mod_path)
-                    shutil.copytree(source_mod_path, destination_mod_path)
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Failed to install mod: {mod}. Error: {e}")
+
+                # Update progress dialog
+                progress_percentage = int((index / total_mods) * 100)
+                progress_dialog.setValue(progress_percentage)
+                progress_dialog.setLabelText(f"Copying mod: {mod} ({index}/{total_mods})")
+                QApplication.processEvents()  # Keep the UI responsive
+
+                # Handle user cancellation
+                if progress_dialog.wasCanceled():
+                    QMessageBox.warning(self, "Installation Canceled", "The installation process was canceled.")
                     return
-            else:
-                print(f"Skipping excluded mod: {mod}")
 
-        # Close the installation popup if it exists
-        if popup:
-            self.install_popup_open = False
-            popup.close()
+                # Perform the copy operation
+                if os.path.exists(destination_mod_path):
+                    shutil.rmtree(destination_mod_path)
+                shutil.copytree(source_mod_path, destination_mod_path)
 
-        # Show installation success message
-        msg_box = QMessageBox()
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setWindowTitle("Install Status")
-        msg_box.setText("Successfully installed modpack.")
-        msg_box.exec()
-        
+            # Close the progress dialog
+            progress_dialog.close()
+
+            # Show installation success message
+            QMessageBox.information(self, "Install Status", "Successfully installed modpack.")
+
+        except Exception as e:
+            progress_dialog.close()
+            QMessageBox.critical(self, "Error", f"An error occurred during installation: {e}")
+
+        finally:
+            # Ensure the installation popup is closed
+            if popup:
+                self.install_popup_open = False
+                popup.close()
+
     def save_and_install(self, mod_vars, popup):
         self.save_preferences(mod_vars)
         self.excluded_mods = self.read_preferences()
