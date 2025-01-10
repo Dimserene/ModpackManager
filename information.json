@@ -48,11 +48,6 @@
           "name": "Experimental-Pack",
           "url": "https://github.com/Dimserene/Experimental-Pack.git",
           "description": "Contains relatively new mods, for fresh new features and concepts."
-        },
-        {
-          "name": "BetterCalc-Pack",
-          "url": "https://github.com/Dimserene/BetterCalc-Pack.git",
-          "description": "a WIP pack that contains mods that are compatible with Better Calc."
         }
       ]
     },
