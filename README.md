@@ -1,4 +1,4 @@
-# Dimserene's Modpack Manager
+# Dimserene's Modpack Manager for Balatro
 
 **Directions for First time users: open modpack manager -> install(or update) lovely -> select modpack -> download -> install -> save & install**
 
