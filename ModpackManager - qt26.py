@@ -4,8 +4,9 @@ from PyQt6.QtGui import QColor, QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer, QProcess, QThread, pyqtSignal, QPoint
 from PyQt6.QtWidgets import QMenu, QSplitter, QListWidgetItem, QScrollArea, QFrame, QProgressDialog, QHBoxLayout, QFileDialog, QMessageBox, QApplication, QCheckBox, QLineEdit, QDialog, QLabel, QPushButton, QComboBox, QGridLayout, QWidget, QVBoxLayout, QSpinBox
 from git import Repo, GitCommandError
-from packaging import version
+from packaging.version import Version
 import pandas as pd
+
 
 ############################################################
 # Detect OS and set default settings
@@ -39,13 +40,33 @@ elif system_platform == "Linux":
     }
 
 # File paths for settings and installation exclusions
-SETTINGS_FILE = "user_settings.json"
-INSTALL_FILE = "excluded_mods.json" 
-FAVORITES_FILE = "favorites.json"
+SETTINGS_FOLDER = os.path.expandvars("%AppData%\\Balatro\\ManagerSettings")  # Replace with the correct path if different
+SETTINGS_FILE = os.path.join(SETTINGS_FOLDER, "user_settings.json")
+INSTALL_FILE = os.path.join(SETTINGS_FOLDER, "excluded_mods.json")
+FAVORITES_FILE = os.path.join(SETTINGS_FOLDER, "favorites.json")
 
-DATE = "2025/01/05"
+DATE = "2025/01/12"
 ITERATION = "26"
-VERSION = "1.6.9"
+VERSION = Version("1.6.10")  # Current version of the Modpack Manager
+
+# Ensure the Mods folder and required files exist
+def ensure_settings_folder_exists():
+    if not os.path.exists(SETTINGS_FOLDER):
+        os.makedirs(SETTINGS_FOLDER)
+        print(f"Created Mods folder at: {SETTINGS_FOLDER}")
+
+    # Create default JSON files if they don't exist
+    for file_path, default_content in [
+        (SETTINGS_FILE, DEFAULT_SETTINGS),
+        (INSTALL_FILE, []),
+        (FAVORITES_FILE, [])
+    ]:
+        if not os.path.exists(file_path):
+            with open(file_path, "w") as f:
+                json.dump(default_content, f, indent=4)
+            print(f"Created file: {file_path}")
+
+ensure_settings_folder_exists()
 
 def set_git_buffer_size():
     try:
@@ -717,15 +738,22 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         super(ModpackManagerApp, self).closeEvent(event)
 
     def check_for_updates(self):
-        # Fetch the latest version and download URL from modpack_data
-        latest_version = self.modpack_data.get('latest_version')
-        download_url = self.modpack_data.get('download_url')
-        changelog = self.modpack_data.get('changelog')
+        """
+        Check if an update is available for the manager.
+        """
+        latest_version_str = self.modpack_data.get("latest_version", None)
+        if not latest_version_str:
+            QMessageBox.warning(self, "Update Check", "Could not fetch the latest version information.")
+            return
 
-        # Compare with the current version
-        if VERSION != latest_version:
-            # An update is available
-            self.prompt_update(latest_version, download_url, changelog)
+        try:
+            latest_version = Version(latest_version_str)
+        except ValueError:
+            QMessageBox.warning(self, "Update Check", f"Invalid version format: {latest_version_str}")
+            return
+
+        if VERSION < latest_version:
+            self.prompt_update(latest_version_str, self.modpack_data.get("download_url"), self.modpack_data.get("changelog"))
 
     def prompt_update(self, latest_version, download_url, changelog):
         # Display the update prompt with "Ok" and "Cancel" buttons
@@ -807,7 +835,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         modpack_names = self.get_modpack_names()
 
         self.modpack_var = QComboBox(self)
-        self.modpack_var.setEditable(True)
         self.modpack_var.addItems(modpack_names)
 
         # Descriptions
@@ -873,24 +900,24 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.uninstall_button.clicked.connect(self.uninstall_modpack)
         self.uninstall_button.setToolTip("Delete Mods folder and its contents")
 
-        # Time Travel button
-        self.revert_button = QPushButton("Time Travel", self)
-        self.revert_button.setStyleSheet("font: 10pt 'Helvetica';")
-        layout.addWidget(self.revert_button, 8, 0, 1, 2)
-        self.revert_button.clicked.connect(self.open_revert_popup)
-        self.revert_button.setToolTip("Revert the modpack to a certain historical version")
+        # # Time Travel button
+        # self.revert_button = QPushButton("Time Travel", self)
+        # self.revert_button.setStyleSheet("font: 10pt 'Helvetica';")
+        # layout.addWidget(self.revert_button, 8, 0, 1, 2)
+        # self.revert_button.clicked.connect(self.open_revert_popup)
+        # self.revert_button.setToolTip("Revert the modpack to a certain historical version")
 
         # Verify Integrity button
         self.verify_button = QPushButton("Verify Integrity", self)
         self.verify_button.setStyleSheet("font: 10pt 'Helvetica';")
-        layout.addWidget(self.verify_button, 8, 2, 1, 2)  # Adjust grid position as needed
+        layout.addWidget(self.verify_button, 8, 0, 1, 3)  # Adjust grid position as needed
         self.verify_button.clicked.connect(self.verify_modpack_integrity)
         self.verify_button.setToolTip("Check modpack for missing or incomplete files")
 
         # Auto backup button
         self.backup_button = QPushButton("Backup Save", self)
         self.backup_button.setStyleSheet("font: 10pt 'Helvetica';")
-        layout.addWidget(self.backup_button, 8, 4, 1, 2)
+        layout.addWidget(self.backup_button, 8, 3, 1, 3)
         self.backup_button.clicked.connect(self.auto_backup_popup)
         self.backup_button.setToolTip("Automatically backup saves in set duration")
 
@@ -946,13 +973,23 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         """)
         layout.addWidget(self.tutorial_link, 11, 0, 1, 2)
 
-        Date = DATE
-        Iteration = ITERATION
-        Version = VERSION
+        latest_version_str = self.modpack_data.get("latest_version", None)
 
-        # Modpack Manager Info
-        self.info = QLabel(f"Build: {Date}, Iteration: {Iteration}, Version: Release {Version}", self)
-        self.info.setStyleSheet("font: 8pt 'Helvetica';")
+        # Validate and compare versions
+        if latest_version_str:
+            try:
+                latest_version = Version(latest_version_str)
+                if VERSION > latest_version:
+                    version_style = "color: red;"  # Local version is greater
+                else:
+                    version_style = "color: black;"  # Default style
+            except ValueError:
+                version_style = "color: orange;"  # Invalid version format
+        else:
+            version_style = "color: gray;"  # No version fetched
+
+        self.info = QLabel(f"Build: {DATE}, Iteration: {ITERATION}, Version: Release {VERSION}", self)
+        self.info.setStyleSheet(f"font: 8pt 'Helvetica'; {version_style}")
         layout.addWidget(self.info, 11, 0, 1, 6, alignment=Qt.AlignmentFlag.AlignRight)
 
         # Apply the grid layout to the window
@@ -1186,7 +1223,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         game_dir_entry = QLineEdit(popup)
         game_dir_entry.setText(self.settings["game_directory"])
-        game_dir_entry.setReadOnly(True)
         layout.addWidget(game_dir_entry, 1, 0, 1, 2)
 
         self.browse_game_directory_button = QPushButton("Browse", popup)
@@ -1203,7 +1239,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         mods_dir_entry = QLineEdit(popup)
         mods_dir_entry.setText(os.path.expandvars(self.settings["mods_directory"]))
-        mods_dir_entry.setReadOnly(True)
         layout.addWidget(mods_dir_entry, 4, 0, 1, 2)
 
         self.open_mods_directory_button = QPushButton("Open", popup)
@@ -1270,48 +1305,23 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     # Function to load settings from the JSON file
     def load_settings(self):
-        if not os.path.exists(SETTINGS_FILE):
-            # If no settings file exists, create it with default settings
-            with open(SETTINGS_FILE, "w") as f:
-                json.dump(DEFAULT_SETTINGS, f, indent=4)
-            return DEFAULT_SETTINGS.copy()
-        else:
-            # Load existing settings from the file
+        try:
             with open(SETTINGS_FILE, "r") as f:
                 return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return DEFAULT_SETTINGS.copy()
 
     # Function to save settings to the JSON file
-    def save_settings(self, popup=None, game_directory=None, mods_directory=None, profile_name=None, default_modpack=None, backup_interval=None, skip_mod_selection=None, auto_install_after_download=None):
+    def save_settings(self, **kwargs):
         try:
-            # Save the settings to the settings dictionary if provided
-            if game_directory is not None:
-                self.settings["game_directory"] = game_directory
-            if profile_name is not None:
-                self.settings["profile_name"] = profile_name
-            if mods_directory is not None:
-                self.settings["mods_directory"] = mods_directory
-            if default_modpack is not None:
-                self.settings["default_modpack"] = default_modpack
-            if backup_interval is not None:
-                self.settings["backup_interval"] = backup_interval
-            if skip_mod_selection is not None:
-                self.settings["skip_mod_selection"] = skip_mod_selection
-            if auto_install_after_download is not None:
-                self.settings["auto_install_after_download"] = auto_install_after_download
-            
-            # Write the settings to the JSON file
+            # Update settings file with provided kwargs
+            settings = self.load_settings()
+            settings.update(kwargs)
             with open(SETTINGS_FILE, "w") as f:
-                json.dump(self.settings, f, indent=4)
-
+                json.dump(settings, f, indent=4)
         except Exception as e:
-            # Display an error message if the save operation fails
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"Failed to save settings: {str(e)}")
-            msg_box.exec()
-
-
+            QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
+            
     # Function to reset settings to defaults
     def reset_to_default(self, game_dir_entry, mods_dir_entry, profile_name_var):
         self.settings = DEFAULT_SETTINGS.copy()
@@ -2057,18 +2067,29 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             return "Failed to fetch commits."
 
     def fetch_commit_messages(self):
-        repos = {
-            "Full Pack": ("Dimserene", "Dimserenes-Modpack"),
-            "Fine-tuned": ("Dimserene", "Fine-tuned-Pack"),
-            "Vanilla+": ("Dimserene", "Vanilla-Plus-Pack"),
-            "Insane Pack": ("Dimserene", "Insane-Pack"),
-            "Cruel Pack": ("Dimserene", "Cruel-Pack"),
-            "Manager": ("Dimserene", "ModpackManager")
-        }
+        # Dynamically fetch repositories from the "Dimserene" category in modpack_data
+        repos = {}
+        if self.modpack_data:
+            for category in self.modpack_data.get("modpack_categories", []):
+                if category.get("category") == "Dimserene":
+                    for modpack in category.get("modpacks", []):
+                        name = modpack.get("name")
+                        url = modpack.get("url")
+                        if name and url:
+                            # Extract owner and repo name from URL
+                            match = re.match(r"https://github\.com/([^/]+)/([^/.]+)", url)
+                            if match:
+                                owner, repo_name = match.groups()
+                                repos[name] = (owner, repo_name)
+
+        # Fetch the latest commit messages for each repository
         commit_messages = {}
-        for repo_name, (owner, name) in repos.items():
-            commit_message = self.get_latest_commit_message(owner, name)
-            commit_messages[repo_name] = commit_message
+        for repo_name, (owner, repo) in repos.items():
+            commit_message = self.get_latest_commit_message(owner, repo)
+            # Adjust tabulation based on the length of the repo_name
+            tabs = "\t\t" if len(repo_name) < 12 else "\t"
+            commit_messages[repo_name] = f"{tabs}{commit_message}"
+
         return commit_messages
 
     def get_version_info(self):
@@ -2628,7 +2649,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             mod_row_container.mousePressEvent = show_context_menu
 
         mod_vars = []  # Clear any existing data
-        favorite_mods = self.load_favorites()  # Load favorites at the start
 
         def toggle_favorite(label, mod):
             """Toggle favorite state for the given mod."""
@@ -2840,24 +2860,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             print(f"Failed to save excluded mods: {e}")
 
     def read_preferences(self):
-        if not os.path.exists(INSTALL_FILE):
-            # Initialize file with an empty JSON array if it doesn't exist
-            with open(INSTALL_FILE, "w") as f:
-                json.dump([], f)
-            print(f"Created new exclusion file: {INSTALL_FILE}")
-            return []
-        
         try:
             with open(INSTALL_FILE, "r") as f:
-                # Ensure JSON parsing and handle potential errors
-                excluded_mods = json.load(f)
-                if not isinstance(excluded_mods, list):  # Validate data type
-                    print("Invalid data format in excluded_mods.json, resetting to empty list.")
-                    return []
-                print(f"Loaded excluded mods: {excluded_mods}")
-                return excluded_mods
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Error loading excluded mods: {e}. Resetting to empty list.")
+                return json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
             return []
 
     # Load favorites from the file
@@ -3119,35 +3125,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def check_versions(self):
         try:
-            install_path = self.mods_dir
-            mods_path = os.path.join(install_path, 'ModpackUtil')
-
-            # Define file paths
-            current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
-            modpack_util_file = os.path.join(mods_path, 'ModpackUtil.lua')
-            current_pack_file = os.path.join(mods_path, 'CurrentPack.txt')  # For Coonie's modpack
-
-            # Load current version
-            current_version = self.read_file_content(current_version_file)
-
-            # Determine pack name
-            pack_name = self.read_file_content(current_pack_file) or self.extract_pack_name(modpack_util_file)
-
             # Fetch commit messages
             commit_messages = self.fetch_commit_messages()
             coonies_version_info = self.get_latest_coonies_tag()
 
             # Prepare version information
             version_info = ""
-            update_message = ""
             for repo_name, commit_message in commit_messages.items():
                 version_info += f"{repo_name}:\t{commit_message}\n"
-                # Check if an update is needed
-                if pack_name == repo_name and current_version and commit_message != current_version:
-                    update_message = "Update available!"
-
-            # Prepare installed information
-            installed_info = f"\nInstalled modpack: {pack_name}\nInstalled version: {current_version}" if pack_name else "\nNo modpack installed or ModpackUtil mod removed."
 
             # Display version and update information
             msg_box = QMessageBox()
@@ -3397,17 +3382,6 @@ if __name__ == "__main__":
                     
         QCheckBox {
             background-color: transparent;  /* Transparent background for checkboxes */
-        }
-                    
-        QCheckBox::indicator {
-            width: 15px;  /* Size of the checkbox */
-            height: 15px;  /* Size of the checkbox */
-            border: 2px solid black;  /* Black outline for checkbox */
-            background-color: #ffffff;  /* White background for checkbox */
-        }
-                    
-        QCheckBox::indicator:checked {
-            background-color: #000000;  /* Black background when checked */
         }
                     
     """)
