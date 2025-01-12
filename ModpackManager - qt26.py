@@ -45,9 +45,9 @@ SETTINGS_FILE = os.path.join(SETTINGS_FOLDER, "user_settings.json")
 INSTALL_FILE = os.path.join(SETTINGS_FOLDER, "excluded_mods.json")
 FAVORITES_FILE = os.path.join(SETTINGS_FOLDER, "favorites.json")
 
-DATE = "2025/01/12"
+DATE = "2025/01/13"
 ITERATION = "26"
-VERSION = Version("1.6.10")  # Current version of the Modpack Manager
+VERSION = Version("1.6.11")  # Current version of the Modpack Manager
 
 # Ensure the Mods folder and required files exist
 def ensure_settings_folder_exists():
@@ -1312,16 +1312,29 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             return DEFAULT_SETTINGS.copy()
 
     # Function to save settings to the JSON file
-    def save_settings(self, **kwargs):
+    def save_settings(self, popup=None, game_directory=None, mods_directory=None, profile_name=None, default_modpack=None, backup_interval=None):
+        # Save the settings to the settings dictionary if provided
+        if game_directory is not None:
+            self.settings["game_directory"] = game_directory
+        if profile_name is not None:
+            self.settings["profile_name"] = profile_name
+        if mods_directory is not None:
+            self.settings["mods_directory"] = mods_directory
+        if default_modpack is not None:
+            self.settings["default_modpack"] = default_modpack
+        if backup_interval is not None:
+            self.settings["backup_interval"] = backup_interval
+
+        # Write the settings to the JSON file
         try:
-            # Update settings file with provided kwargs
-            settings = self.load_settings()
-            settings.update(kwargs)
             with open(SETTINGS_FILE, "w") as f:
-                json.dump(settings, f, indent=4)
+                json.dump(self.settings, f, indent=4)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
-            
+        finally:
+            if popup:
+                popup.close()
+
     # Function to reset settings to defaults
     def reset_to_default(self, game_dir_entry, mods_dir_entry, profile_name_var):
         self.settings = DEFAULT_SETTINGS.copy()

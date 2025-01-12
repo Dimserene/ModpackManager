@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.10",
+  "latest_version": "1.6.11",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Bug fixes and improvements.",
+  "changelog": "- Bug hotfixes (crash when saving settings).",
   "dependencies": {
     "AntonosStakes": ["Talisman"],
     "Bmjokers": ["Bmwallet"],
