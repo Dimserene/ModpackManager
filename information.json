@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.9",
+  "latest_version": "1.6.10",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Fixed reverse select button not reversing depended mods.\n- Displays a progressbar while installing modpack.",
+  "changelog": "- Bug fixes and improvements.",
   "dependencies": {
     "AntonosStakes": ["Talisman"],
     "Bmjokers": ["Bmwallet"],

@@ -1,4 +1,4 @@
-import sys, tempfile, subprocess, math, os, random, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform
+import tempfile, subprocess, math, os, random, re, shutil, requests, webbrowser, zipfile, stat, json, git, time, platform
 from datetime import datetime
 from PyQt6.QtGui import QColor, QDesktopServices
 from PyQt6.QtCore import QUrl, Qt, QTimer, QProcess, QThread, pyqtSignal, QPoint
