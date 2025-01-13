@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.6.11",
+  "latest_version": "1.7.0",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Bug hotfixes (crash when saving settings).",
+  "changelog": "- New logo.\n- Allows saving and managing custom presets.\n- Offline mode.",
   "dependencies": {
     "AntonosStakes": ["Talisman"],
     "Bmjokers": ["Bmwallet"],
