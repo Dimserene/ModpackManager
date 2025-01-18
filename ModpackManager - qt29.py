@@ -1416,7 +1416,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         """Get list of executables or app bundles in the directory."""
         try:
             if system_platform == "Darwin":
-                return [f for f in os.listdir(directory) if f.endswith(".app") and os.path.isdir(os.path.join(directory, f))]
+                return [f for f in os.listdir(directory) if f.endswith(".app")]
             else:
                 return [f for f in os.listdir(directory) if f.endswith(".exe")]
         except FileNotFoundError:
