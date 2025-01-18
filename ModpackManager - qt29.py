@@ -1312,9 +1312,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             # Platform-specific commands to open the directory
             if platform.system() == "Darwin":  # macOS
-                subprocess.run(["open", path], check=True)
+                subprocess.run(["open", os.path.expanduser(path)], check=True)
             elif platform.system() == "Windows":
-                os.startfile(path)  # Windows uses os.startfile
+                os.startfile(os.path.expandvars(path))  # Windows uses os.startfile
             else:
                 # For Linux, use the xdg-open command
                 subprocess.run(["xdg-open", path], check=True)
