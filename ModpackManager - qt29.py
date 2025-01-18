@@ -2701,9 +2701,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
     # Save favorites to the file
     def save_favorites(self):
         """Save favorite mods to a JSON file."""
-        favorites_file = "favorites.json"  # Path to favorites file
         try:
-            with open(favorites_file, "w") as f:
+            with open(FAVORITES_FILE, "w") as f:
                 json.dump(list(self.favorite_mods), f, indent=4)  # Save favorites as a list
         except IOError as e:
             print(f"Error saving favorites: {e}")
