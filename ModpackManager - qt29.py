@@ -3280,10 +3280,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             if archive_name.endswith(".zip"):
                 with zipfile.ZipFile(archive_path, 'r') as zip_ref:
-                    zip_ref.extractall(self.game_dir)
+                    zip_ref.extractall(game_dir)
             elif archive_name.endswith(".tar.gz"):
                 with tarfile.open(archive_path, "r:gz") as tar:
-                    tar.extractall(self.game_dir)
+                    tar.extractall(game_dir)
 
             # Verify extracted files
             missing_files = [f for f in extracted_files if not os.path.exists(os.path.join(game_dir, f))]
