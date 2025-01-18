@@ -1778,7 +1778,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             # Launch the script
             self.process = QProcess(self)
             self.process.start("bash", [lovely_script])
-            QMessageBox.information(self, "Game Launched", "The game is launching via 'run_lovely.sh'.")
 
         else:
             # Unsupported platform
