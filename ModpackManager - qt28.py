@@ -67,6 +67,8 @@ CSV_CACHE_FILE = os.path.join(SETTINGS_FOLDER, "cached_data.csv")
 LOGO_URL = "https://raw.githubusercontent.com/Dimserene/Dimserenes-Modpack/refs/heads/main/NewFullPackLogo%20New%20Year.png"
 LOGO_PATH =  os.path.join(SETTINGS_FOLDER, "logoNewYear.png")  # File name to save the downloaded logo
 
+MODPACKS_FOLDER = os.path.join(os.getcwd(), "Modpacks")  # Folder to store downloaded modpacks
+
 # Ensure the Mods folder and required files exist
 def ensure_settings_folder_exists():
     if not os.path.exists(SETTINGS_FOLDER):
@@ -322,12 +324,15 @@ class ModpackDownloadWorker(QThread):
     def __init__(self, clone_url, repo_name, force_update=False):
         super().__init__()
         self.clone_url = clone_url
-        self.repo_name = repo_name
+        self.repo_name = os.path.join(os.getcwd(), "Modpacks", repo_name)
         self.force_update = force_update
         self.process = None  # Store the QProcess instance
 
     def run(self):
         try:
+            # Ensure the Modpacks folder exists
+            os.makedirs(os.path.dirname(self.repo_name), exist_ok=True)
+
             # Check if the repository folder already exists
             if os.path.exists(self.repo_name):
                 if self.force_update:
@@ -349,51 +354,80 @@ class ModpackDownloadWorker(QThread):
                 self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)  # Merge stdout and stderr
                 git_command = ["git", "clone", "--recurse-submodules", "--remote-submodules", self.clone_url, self.repo_name]
                 
-                # Connect QProcess signals for dynamic error capturing
+                # Connect QProcess signals for dynamic output handling
                 self.process.finished.connect(self.git_finished)
+                self.process.readyReadStandardOutput.connect(self.capture_stdout)
+                self.process.readyReadStandardError.connect(self.capture_stderr)
                 self.process.start(git_command[0], git_command[1:])
-                self.process.waitForFinished(-1)
+                self.process.waitForFinished()
             else:
-                # Download the file (this part will still emit the success message)
-                response = requests.get(self.clone_url, stream=True)
-                if response.status_code != 200:
-                    self.finished.emit(False, f"File download failed: HTTP status {response.status_code}.")
-                    return
-
-                total_size = int(response.headers.get('content-length', 0))
-                downloaded_size = 0
-                local_file_path = os.path.join(os.getcwd(), self.repo_name + '.zip')
-
-                with open(local_file_path, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=1024):
-                        if chunk:
-                            f.write(chunk)
-                            downloaded_size += len(chunk)
-                            # Emit progress signal if you have a connected GUI progress bar
-                            if total_size > 0:
-                                progress_percent = int((downloaded_size / total_size) * 100)
-                                self.progress.emit(progress_percent)
-
-                # Verify the file size after download
-                if downloaded_size != total_size:
-                    self.finished.emit(False, "File download failed: Incomplete file.")
-                    return
-
-                # Unzip if necessary
-                if zipfile.is_zipfile(local_file_path):
-                    try:
-                        with zipfile.ZipFile(local_file_path, 'r') as zip_ref:
-                            zip_ref.extractall(self.repo_name)
-                        os.remove(local_file_path)
-                    except zipfile.BadZipFile:
-                        self.finished.emit(False, "File download failed: Corrupt ZIP file.")
-                        return
-
-                # If file download succeeds, emit success
-                self.finished.emit(True, f"Successfully downloaded {self.repo_name}.")
-
+                # Download the file
+                self.download_file()
         except Exception as e:
             self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
+
+    def download_file(self):
+        """Download a file and extract it if necessary."""
+        try:
+            response = requests.get(self.clone_url, stream=True)
+            if response.status_code != 200:
+                self.finished.emit(False, f"File download failed: HTTP status {response.status_code}.")
+                return
+
+            total_size = int(response.headers.get('content-length', 0))
+            downloaded_size = 0
+            local_file_path = f"{self.repo_name}.zip"
+
+            with open(local_file_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded_size += len(chunk)
+                        # Emit progress signal
+                        if total_size > 0:
+                            progress_percent = int((downloaded_size / total_size) * 100)
+                            self.progress.emit(progress_percent)
+
+            if downloaded_size != total_size:
+                self.finished.emit(False, "File download failed: Incomplete file.")
+                return
+
+            self.extract_zip(local_file_path)
+        except Exception as e:
+            self.finished.emit(False, f"Download error: {str(e)}")
+
+    def extract_zip(self, file_path):
+        """Extract the ZIP file."""
+        try:
+            if zipfile.is_zipfile(file_path):
+                with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    zip_ref.extractall(self.repo_name)
+                os.remove(file_path)
+                self.finished.emit(True, f"Successfully downloaded and extracted {self.repo_name}.")
+            else:
+                self.finished.emit(True, f"Successfully downloaded {self.repo_name}. (Not a ZIP file)")
+        except zipfile.BadZipFile:
+            self.finished.emit(False, "File extraction failed: Corrupt ZIP file.")
+        except Exception as e:
+            self.finished.emit(False, f"Unexpected error during extraction: {str(e)}")
+
+    def capture_stdout(self):
+        """Capture real-time stdout from Git."""
+        output = self.process.readAllStandardOutput().data().decode('utf-8').strip()
+        print(output)
+
+    def capture_stderr(self):
+        """Capture real-time stderr from Git."""
+        error = self.process.readAllStandardError().data().decode('utf-8').strip()
+        print(error)
+
+    def git_finished(self):
+        """Handle completion of the Git cloning process."""
+        if self.process.exitCode() == 0:
+            self.finished.emit(True, f"Successfully cloned repository: {self.repo_name}.")
+        else:
+            error_message = self.process.readAllStandardError().data().decode('utf-8').strip()
+            self.finished.emit(False, f"Git clone failed: {error_message}")
 
     def git_finished(self):
         """Callback for handling the QProcess finish signal for Git operations."""
@@ -476,9 +510,12 @@ class ModpackUpdateWorker(QThread):
     finished = pyqtSignal(bool, str)  # Signal to indicate task completion with success status and message
     progress = pyqtSignal(str)       # Signal to report progress to the GUI
 
-    def __init__(self, repo_path):
+    def __init__(self, repo_url, repo_name, branch_name, parent_folder):
         super().__init__()
-        self.repo_path = repo_path
+        self.repo_url = repo_url
+        self.repo_name = repo_name
+        self.branch_name = branch_name
+        self.repo_path = os.path.join(parent_folder, self.repo_name)
 
     def run(self):
         try:
@@ -498,11 +535,21 @@ class ModpackUpdateWorker(QThread):
                 self.finished.emit(False, f"Error resetting repository: {str(e)}")
                 return
 
+            # Pull the latest changes
             self.progress.emit("Pulling latest changes...")
-            repo.remotes.origin.pull()
+            try:
+                repo.remotes.origin.pull()
+            except GitCommandError as e:
+                self.finished.emit(False, f"Error pulling latest changes: {str(e)}")
+                return
 
+            # Update submodules
             self.progress.emit("Updating submodules...")
-            update_submodules(repo)
+            try:
+                self.update_submodules(repo)
+            except GitCommandError as e:
+                self.finished.emit(False, f"Error updating submodules: {str(e)}")
+                return
 
             self.finished.emit(True, "Modpack and submodules updated successfully.")
         except GitCommandError as e:
@@ -510,197 +557,10 @@ class ModpackUpdateWorker(QThread):
         except Exception as e:
             self.finished.emit(False, f"Unexpected error: {str(e)}")
 
-class MultiModpackWorker(QThread):
-    progress = pyqtSignal(int)
-    status_message = pyqtSignal(str)
-    finished = pyqtSignal(bool, str)  # Signal with two arguments (success, message)
-
-    def __init__(self, modpack_names, operation, main_window):
-        super().__init__()
-        self.modpack_names = modpack_names
-        self.operation = operation  # 'download' or 'update'
-        self.main_window = main_window
-
-    def run(self):
-        try:
-            for index, modpack_name in enumerate(self.modpack_names):
-                # Check for cancellation
-                if self.isInterruptionRequested():
-                    self.status_message.emit("Operation cancelled.")
-                    self.finished.emit(False, "Operation cancelled by the user.")
-                    return
-
-                # Fetch the modpack URL
-                clone_url = self.get_modpack_url(modpack_name)
-                if not clone_url:
-                    self.status_message.emit(f"URL not found for {modpack_name}. Skipping.")
-                    self.progress.emit(index + 1)
-                    continue
-
-                # Determine the repository name
-                repo_name = self.get_repo_name(clone_url, modpack_name)
-                repo_path = os.path.join(os.getcwd(), repo_name)
-
-                try:
-                    if self.operation == 'download':
-                        # Handle the download operation
-                        self.handle_download(clone_url, repo_name, modpack_name, repo_path)
-                    elif self.operation == 'update':
-                        # Handle the update operation
-                        self.handle_update(modpack_name, repo_path)
-                    else:
-                        self.status_message.emit(f"Invalid operation for {modpack_name}.")
-                except Exception as e:
-                    error_message = f"Error processing {modpack_name}: {e}"
-                    print(error_message)
-                    self.status_message.emit(error_message)
-
-                # Update progress
-                self.progress.emit(int(((index + 1) / len(self.modpack_names)) * 100))
-
-            # Emit success when all modpacks are processed without interruption
-            self.finished.emit(True, "All modpacks processed successfully.")
-        except Exception as e:
-            self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
-
-    def get_modpack_url(self, modpack_name):
-        """Retrieve the URL for the specified modpack."""
-        modpack_info = self.main_window.get_modpack_info(modpack_name)
-        return modpack_info['url'] if modpack_info else ""
-
-    def get_repo_name(self, clone_url, modpack_name):
-        """Determine the name of the repository based on the clone URL or modpack name."""
-        if clone_url.endswith('.git'):
-            return clone_url.split('/')[-1].replace('.git', '')
-        return modpack_name.replace(' ', '_')
-
-    def handle_download(self, clone_url, repo_name, modpack_name, repo_path):
-        """Handle the download operation for a modpack."""
-        # Check for cancellation before downloading
-        if self.isInterruptionRequested():
-            self.status_message.emit(f"Operation cancelled while processing {modpack_name}.")
-            self.finished.emit(False, "Operation cancelled by the user.")
-            return
-
-        # If the modpack exists, remove it before re-downloading
-        if os.path.isdir(repo_path):
-            self.status_message.emit(f"Removing existing {modpack_name}...")
-            shutil.rmtree(repo_path, onerror=readonly_handler)
-
-        # Download the modpack
-        self.status_message.emit(f"Downloading {modpack_name}...")
-        self.download_modpack(clone_url, repo_name)
-
-    def handle_update(self, modpack_name, repo_path):
-        """Handle the update operation for a modpack."""
-        if os.path.isdir(repo_path):
-            self.status_message.emit(f"Updating {modpack_name}...")
-            self.update_modpack(repo_path)
-        else:
-            self.status_message.emit(f"Modpack {modpack_name} not found. Cannot update.")
-            self.finished.emit(False, f"Modpack {modpack_name} not found. Cannot update.")
-
-    def download_modpack(self, clone_url, repo_name):
-        """Download a modpack from a given URL, including submodules if applicable."""
-        try:
-            if clone_url.endswith('.git'):
-                # Clone the repository with submodules
-                self.status_message.emit(f"Cloning repository: {repo_name}...")
-                repo = git.Repo.clone_from(clone_url, repo_name, recursive=True)
-
-                # Emit status message for each submodule during the download
-                if repo.submodules:
-                    total_submodules = len(repo.submodules)
-                    for idx, submodule in enumerate(repo.submodules):
-                        self.status_message.emit(f"Downloading submodule: {submodule.name} ({idx + 1}/{total_submodules})")
-                        submodule.update(init=True, recursive=True)
-
-                        # Emit progress for submodules (optional)
-                        progress_percent = int(((idx + 1) / total_submodules) * 100)
-                        self.progress.emit(progress_percent)
-
-                print(f"Downloaded {repo_name} with submodules.")
-                self.status_message.emit(f"Downloaded {repo_name} with all submodules.")
-            else:
-                # Handle direct downloads
-                self.download_direct_modpack(clone_url, repo_name)
-        except Exception as e:
-            error_message = f"Failed to download {repo_name}: {e}"
-            print(error_message)
-            self.status_message.emit(error_message)
-            self.finished.emit(False, error_message)
-
-    def download_direct_modpack(self, clone_url, repo_name):
-        """Handle direct download of a modpack if it's not a Git repository."""
-        try:
-            response = requests.get(clone_url, stream=True)
-            response.raise_for_status()
-            zip_file_path = os.path.join(os.getcwd(), f"{repo_name}.zip")
-
-            with open(zip_file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if self.isInterruptionRequested():
-                        self.status_message.emit(f"Operation cancelled while downloading {repo_name}.")
-                        self.finished.emit(False, "Operation cancelled by the user.")
-                        return
-                    f.write(chunk)
-
-            # Unzip the file
-            with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-                zip_ref.extractall(repo_name)
-            os.remove(zip_file_path)
-            self.status_message.emit(f"Downloaded and extracted {repo_name}")
-            print(f"Downloaded and extracted {repo_name}")
-        except Exception as e:
-            error_message = f"Failed to download {repo_name}: {e}"
-            print(error_message)
-            self.status_message.emit(error_message)
-            self.finished.emit(False, error_message)
-
-    def update_modpack(self, repo_path):
-        """Update an existing modpack."""
-        try:
-            # Check if the repo path exists and is a valid Git repository
-            if not os.path.exists(repo_path) or not os.path.isdir(repo_path):
-                self.finished.emit(False, f"Invalid repository path: {repo_path}")
-                return
-
-            # Initialize the Git repository
-            repo = Repo(repo_path)
-
-            # Perform git pull to get the latest changes
-            print("Pulling latest changes...")
-            self.status_message.emit("Pulling latest changes...")
-            repo.remotes.origin.pull()
-
-            # Count total submodules for progress tracking
-            total_submodules = len(repo.submodules)
-            for idx, submodule in enumerate(repo.submodules):
-                try:
-                    submodule_name = submodule.name
-                    print(f"Updating submodule: {submodule_name} ({idx + 1}/{total_submodules})")
-                    self.status_message.emit(f"Updating submodule: {submodule_name} ({idx + 1}/{total_submodules})")
-
-                    # Update submodule (init if needed, update recursively)
-                    submodule.update(init=True, recursive=True)
-
-                    # Emit progress update (optional)
-                    progress_percent = int(((idx + 1) / total_submodules) * 100)
-                    self.progress.emit(progress_percent)
-                except GitCommandError as submodule_error:
-                    error_message = f"Failed to update submodule '{submodule_name}': {str(submodule_error)}"
-                    print(error_message)
-                    self.status_message.emit(error_message)
-                    self.finished.emit(False, error_message)
-                    return
-
-            # Emit success signal if everything was updated
-            self.finished.emit(True, "Modpack updated successfully.")
-        except GitCommandError as e:
-            self.finished.emit(False, f"Failed to update modpack: {str(e)}")
-        except Exception as e:
-            self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
-
+    def update_submodules(self, repo):
+        """Update all submodules recursively."""
+        repo.git.submodule('update', '--init', '--recursive')
+        self.progress.emit("Submodules updated.")
 
 ############################################################
 # Tutorial class
@@ -784,6 +644,18 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         super(ModpackManagerApp, self).__init__(*args, **kwargs)
         self.setWindowTitle("Dimserene's Modpack Manager")
 
+        # Load the splash screen
+        splash_pixmap = QPixmap(LOGO_PATH).scaled(
+            400, 400, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+        )
+        self.splash = QSplashScreen(splash_pixmap, Qt.WindowType.WindowStaysOnTopHint)
+        self.splash.showMessage(
+            "Loading Modpack Manager...",
+            Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
+            Qt.GlobalColor.white,
+        )
+        self.splash.show()
+
         # Flags to track whether the popups are open
         self.settings_popup_open = False
         self.revert_popup_open = False
@@ -802,7 +674,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             self.modpack_data = {"modpack_categories": []}  # Use empty data as a fallback
 
         self.branch_data = {}        # Dictionary to store branches for each modpack
-        self.initialize_branches()   # List all branches on startup
 
         # Load favorite mods
         self.favorite_mods = set()  # Initialize favorites
@@ -834,8 +705,11 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         if not self.modpack_data:
             QMessageBox.critical(self, "Error", "Failed to load modpack data. Please check your internet connection.")
             return
-
+        self.splash.finish(self)
         self.create_widgets()
+        
+        self.initialize_branches()   # List all branches on startup
+        self.update_branch_dropdown()
         self.update_installed_info()  # Initial update
         self.check_for_updates()
 
@@ -889,19 +763,23 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             return
 
         if VERSION < latest_version:
+            # Close the splash screen if it's still open
+            if hasattr(self, "splash") and self.splash.isVisible():
+                self.splash.finish(self)
             self.prompt_update(latest_version_str, self.modpack_data.get("download_url"), self.modpack_data.get("changelog"))
 
     def prompt_update(self, latest_version, download_url, changelog):
-        # Display the update prompt with "Ok" and "Cancel" buttons
-        reply = QMessageBox.question(
+        """Prompt the user to update if a new version is available."""
+        response = QMessageBox.question(
             self,
-            "Update Available",
-            f"A new version ({latest_version}) is available.\nChangelog:\n{changelog}\n\nWould you like to download it from the official website?",
-            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+            "New Version Available",
+            f"A new version ({latest_version}) of the modpack is available.\n\nChangelog:\n{changelog}\n\nDo you want to download it?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes,
         )
 
         # Open the download URL only if the user clicked "Ok"
-        if reply == QMessageBox.StandardButton.Ok:
+        if response == QMessageBox.StandardButton.Ok:
             webbrowser.open(download_url)
                 
     def apply_modpack_styles(self, modpack_name):
@@ -912,17 +790,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             self.apply_elbes_play_button_style()  # Dark Blue for Elbe's Modpack
         else:
             self.apply_default_play_button_style()  # Green for other modpacks
-
-    def initialize_branches(self):
-        """Lists all branches for each modpack and stores them."""
-        for category in self.modpack_data.get("modpack_categories", []):
-            for modpack in category.get("modpacks", []):
-                modpack_name = modpack["name"]
-                self.branch_data[modpack_name] = self.list_branches(modpack_name, modpack_data)
-
-        print("Branch data initialized:")
-        for modpack, branches in self.branch_data.items():
-            print(f"{modpack}: {branches}")
 
 ############################################################
 # Foundation of root window
@@ -935,19 +802,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 for modpack in category.get('modpacks', []):
                     modpack_names.append(modpack['name'])
         return modpack_names
-    
-    def list_branches(self, modpack_name, modpack_data):
-        """Lists all branches of a given modpack from the JSON data."""
-        for category in modpack_data.get("modpack_categories", []):
-            for modpack in category.get("modpacks", []):
-                if modpack["name"] == modpack_name:
-                    # If "branches" is defined in the JSON, return them
-                    if "branches" in modpack:
-                        return modpack["branches"]
-                    else:
-                        # Assume only the "main" branch if not defined
-                        return ["main"]
-        return []
 
     def create_widgets(self):
         layout = QGridLayout()
@@ -1013,7 +867,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Download button
         self.download_button = QPushButton("Download", self)
         self.download_button.setStyleSheet("font: 12pt 'Helvetica';")
-        layout.addWidget(self.download_button, 6, 0, 1, 2)
+        layout.addWidget(self.download_button, 6, 0, 1, 3)
         self.download_button.clicked.connect(lambda: self.download_modpack(main_window=self))
         self.download_button.setToolTip("Download (clone) selected modpack to the same directory as manager")
 
@@ -1039,16 +893,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Quick Update button
         self.update_button = QPushButton("Quick Update", self)
         self.update_button.setStyleSheet("font: 12pt 'Helvetica';")
-        layout.addWidget(self.update_button, 6, 2, 1, 2)
+        layout.addWidget(self.update_button, 6, 3, 1, 3)
         self.update_button.clicked.connect(self.update_modpack)
         self.update_button.setToolTip("Quickly update downloaded modpacks (can be malfunctioned)")
 
-        # Multi-Download/Update button
-        self.multi_download_button = QPushButton("Multi Mode", self)
-        self.multi_download_button.setStyleSheet("font: 12pt 'Helvetica';")
-        layout.addWidget(self.multi_download_button, 6, 4, 1, 2)
-        self.multi_download_button.clicked.connect(self.open_multi_modpack_popup)
-        self.multi_download_button.setToolTip("Download or update multiple modpacks at once")
+        # # Multi-Download/Update button
+        # self.multi_download_button = QPushButton("Multi Mode", self)
+        # self.multi_download_button.setStyleSheet("font: 12pt 'Helvetica';")
+        # layout.addWidget(self.multi_download_button, 6, 4, 1, 2)
+        # self.multi_download_button.clicked.connect(self.open_multi_modpack_popup)
+        # self.multi_download_button.setToolTip("Download or update multiple modpacks at once")
 
         # Install button
         self.install_button = QPushButton("Install (Copy)", self)
@@ -1191,6 +1045,30 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             f"font: 16pt 'Helvetica'; "
             f"color: {color_hex};"
         )
+            
+    def get_repo_url(self, modpack_name):
+        """Returns the Git URL for the selected modpack."""
+        return self.modpack_data.get(modpack_name, {}).get("url", "")
+
+    def initialize_branches(self):
+        """Lists all branches for each modpack and stores them."""
+        for category in self.modpack_data.get("modpack_categories", []):
+            for modpack in category.get("modpacks", []):
+                modpack_name = modpack["name"]
+                self.branch_data[modpack_name] = self.list_branches(modpack_name)
+
+        print("Branch data initialized:")
+        for modpack, branches in self.branch_data.items():
+            print(f"{modpack}: {branches}")
+
+    def list_branches(self, modpack_name):
+        """Lists all branches of a given modpack from the JSON data."""
+        for category in self.modpack_data.get("modpack_categories", []):
+            for modpack in category.get("modpacks", []):
+                if modpack["name"] == modpack_name:
+                    # Return defined branches or default to ["main"]
+                    return modpack.get("branches", ["main"])
+        return []
 
     def update_branch_dropdown(self):
         """Update branch dropdown based on the selected modpack."""
@@ -1200,11 +1078,11 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         if branches:
             self.branch_var.clear()
             self.branch_var.addItems(branches)
-            
-    def get_repo_url(self, modpack_name):
-        """Returns the Git URL for the selected modpack."""
-        return self.modpack_data.get(modpack_name, {}).get("url", "")
-
+            self.branch_var.setVisible(True)
+        else:
+            self.branch_var.clear()
+            self.branch_var.setVisible(False)
+            QMessageBox.information(self, "Info", f"No branches available for {selected_modpack}.")
 
 ############################################################
 # Multi Mode
@@ -2389,94 +2267,51 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.exec()
 
     def download_modpack(self, main_window=None, clone_url=None):
-        """Download the selected modpack, with offline handling."""
-        if not is_online():
-            QMessageBox.warning(self, "Offline Mode", "Cannot download modpacks in offline mode. Please connect to the internet.")
+        """Download the selected modpack with a prompt for overwriting."""
+        modpack_name = self.modpack_var.currentText()
+        selected_branch = self.branch_var.currentText() if self.branch_var.isVisible() else "main"
+        repo_url = clone_url or self.get_modpack_url(modpack_name)
+
+        if not repo_url:
+            QMessageBox.critical(self, "Error", "Invalid modpack URL.")
             return
-            
-        try:
-            modpack_name = self.modpack_var.currentText()
-            if not clone_url:
-                clone_url = self.get_modpack_url(modpack_name)
 
-            # Special case for Coonie's Modpack
-            if modpack_name == "Coonie's Modpack":
-                coonies_modpack_path = os.path.join(os.getcwd(), "Coonies-Modpack")
-                
-                # Check if "Coonies-Modpack" folder is already present
-                if os.path.isdir(coonies_modpack_path):
-                    # Prompt user whether to overwrite the existing folder or skip download
-                    msg_box = QMessageBox()
-                    msg_box.setIcon(QMessageBox.Icon.Question)
-                    msg_box.setWindowTitle("Confirm update/redownload")
-                    msg_box.setText("Coonie's Modpack is already downloaded. Update/Redownload?")
-                    msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                    response = msg_box.exec()
+        # Define the full path for the repository
+        folder_name = f"{modpack_name}-{selected_branch}" if selected_branch != "main" else modpack_name
+        repo_path = os.path.join(os.getcwd(), "Modpacks", folder_name)
 
-                    if response == QMessageBox.StandardButton.No:
-                        return  # Exit early, as the user chose not to overwrite
+        # Check if the folder already exists
+        if os.path.exists(repo_path):
+            response = QMessageBox.question(
+                self,
+                "Overwrite Existing Modpack",
+                f"The folder '{folder_name}' already exists. Do you want to overwrite it?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if response == QMessageBox.StandardButton.No:
+                return  # Exit early if the user does not want to overwrite
 
-                # Show a progress dialog while downloading and unzipping
-                self.show_progress_dialog(main_window, modpack_name)
-
-                # Download and unzip the Coonie's Modpack
-                self.download_and_unzip_coonies_modpack()
-
-                # Close the progress dialog
-                self.progress_dialog.close()
-                return  # Exit early, as we don't want to continue with the regular flow
-
-            # Regular modpack download flow for other modpacks
-            if not clone_url:
-                clone_url = self.get_modpack_url(modpack_name)
-
-            if not clone_url:
-                msg_box = QMessageBox()
-                msg_box.setIcon(QMessageBox.Icon.Critical)
-                msg_box.setWindowTitle("Error")
-                msg_box.setText("Modpack URL not found. Please ensure you selected a valid modpack.")
-                msg_box.exec()
+            # If Yes, delete the existing folder
+            try:
+                shutil.rmtree(repo_path)
+                print(f"Deleted existing folder: {repo_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to delete existing folder: {str(e)}")
                 return
 
-            repo_name = clone_url.split('/')[-1].replace('.git', '')
+        # Ensure the Modpacks folder exists
+        os.makedirs(os.path.dirname(repo_path), exist_ok=True)
 
-            # Prompt force download if the repository directory already exists
-            force_update = False
-            if os.path.isdir(repo_name):
-                msg_box = QMessageBox()
-                msg_box.setIcon(QMessageBox.Icon.Question)
-                msg_box.setWindowTitle("Confirm update/redownload")
-                msg_box.setText(f"{repo_name} is already downloaded. Update/Redownload?")
-                msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-                msg_box.setDefaultButton(QMessageBox.StandardButton.No)
+        # Start the download process
+        self.progress_dialog = QProgressDialog(f"Downloading {modpack_name} ({selected_branch})...", None, 0, 0, self)
+        self.progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        self.progress_dialog.setAutoClose(True)
+        self.progress_dialog.show()
 
-                # Show the message box and capture the response
-                force_update = msg_box.exec() == QMessageBox.StandardButton.Yes
-                if not force_update:
-                    return
-
-            # Show the progress dialog
-            self.show_progress_dialog(main_window, modpack_name)
-
-            # Create the worker for downloading modpack
-            self.worker = ModpackDownloadWorker(clone_url, repo_name, force_update)
-            self.worker.finished.connect(self.on_download_finished)
-
-            # Start the worker (background task)
-            self.worker.start()
-
-        except Exception as e:
-            # Ensure the progress dialog is closed on error
-            if self.progress_dialog:
-                self.progress_dialog.close()
-
-            # Handle unexpected errors
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"An unexpected error occurred: {str(e)}")
-            msg_box.exec()
-            print(f"Unexpected error during download: {e}")
+        self.worker = ModpackDownloadWorker(repo_url, folder_name, force_update=True)
+        self.worker.progress.connect(self.update_progress_dialog)
+        self.worker.finished.connect(self.on_download_finished)
+        self.worker.start()
 
     def on_download_finished(self, success, message):
         # Close the progress dialog
@@ -2566,50 +2401,70 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             return "Error fetching the latest version."
 
     def update_modpack(self):
+        """Update the selected modpack with branch support."""
         modpack_name = self.modpack_var.currentText()
-        clone_url = self.get_modpack_url(modpack_name)
-        repo_name = clone_url.split('/')[-1].replace('.git', '')
-        repo_path = os.path.join(os.getcwd(), repo_name)
-        selected_modpack = self.modpack_var.currentText()
+        repo_url = self.get_modpack_url(modpack_name)
+        selected_branch = self.branch_var.currentText()
+
+        # Ensure consistent use of the Modpacks folder
+        parent_folder = os.path.join(os.getcwd(), "Modpacks")
+        os.makedirs(parent_folder, exist_ok=True)  # Ensure the parent folder exists
+
+        # Correctly construct the repository name with branch
+        if selected_branch != "main":
+            repo_name = f"{modpack_name}-{selected_branch}"
+        else:
+            repo_name = modpack_name
+
+        # Construct the full path to the repository
+        repo_path = os.path.join(parent_folder, repo_name)
+
+        # Debugging (optional): Print constructed paths
+        print(f"Modpack Name: {modpack_name}")
+        print(f"Branch Name: {selected_branch}")
+        print(f"Repo Name: {repo_name}")
+        print(f"Repo Path: {repo_path}")
 
         # Check if the selected modpack is "Coonie's Modpack"
-        if selected_modpack == "Coonie's Modpack":
-            # Show a popup message and prevent closing the window
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("Incompatible Modpack")
-            msg_box.setText("This function is not compatible with Coonie's Modpack! Please use Download/Update instead.")
-            msg_box.exec()
+        if modpack_name == "Coonie's Modpack":
+            QMessageBox.warning(
+                self,
+                "Incompatible Modpack",
+                "This function is not compatible with Coonie's Modpack! Please use Download/Update instead."
+            )
+            return
 
-        # Check if the repository exists
+        # Check if the repository exists in the Modpacks folder
         if not os.path.isdir(repo_path):
-            QMessageBox.critical(self, "Error", "Repository not found. Attempting to clone it.")
-            self.download_modpack(main_window=self, clone_url=clone_url)  # Attempt to download the modpack if it's not found
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Repository not found in Modpacks folder. Attempting to clone it at {repo_path}."
+            )
+            self.download_modpack(main_window=self, clone_url=repo_url)
             return
 
         # Create and display the progress dialog for updating
         self.progress_dialog = QProgressDialog("", None, 0, 0)  # Pass None to remove the cancel button
-        self.progress_dialog.setWindowFlags(Qt.WindowType.FramelessWindowHint)  # No always-on-top flag
+        self.progress_dialog.setWindowFlags(Qt.WindowType.FramelessWindowHint)  # No title bar
         self.progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)  # Modal
         self.progress_dialog.setAutoClose(True)
         self.progress_dialog.setAutoReset(True)
-
-        # Apply custom QSS (Qt Style Sheets) for border and text styling
         self.progress_dialog.setStyleSheet("""
             QProgressDialog {
-                border: 3px solid #555;  /* Add a border */
-                background-color: #ffffff;  /* Background color */
+                border: 3px solid #555;
+                background-color: #ffffff;
             }
             QLabel {
-                font-size: 24px;  /* Larger text */
-                font-weight: bold;  /* Bold text */
-                color: #333;  /* Text color */
+                font-size: 24px;
+                font-weight: bold;
+                color: #333;
                 background-color: transparent;
             }
         """)
 
         # Create a custom QLabel for the message with the modpack name
-        label = QLabel(f"Updating {modpack_name}...")  # Show the name of the modpack
+        label = QLabel(f"Updating {modpack_name}({selected_branch})...")  # Show the name of the modpack
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center-align the text
         label.setStyleSheet("""
             QLabel {
@@ -2622,21 +2477,19 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         layout.addWidget(label)
 
         self.progress_dialog.setLayout(layout)
-
-        # Show the progress dialog immediately (no delay)
         self.progress_dialog.show()
 
-        # Center the progress dialog relative to the parent popup
-        if isinstance(self, QWidget):  # Ensure self is a valid QWidget
-            parent_geometry = self.geometry()  # Get the parent window's geometry
-            dialog_geometry = self.progress_dialog.frameGeometry()  # Get the dialog's geometry
-            dialog_geometry.moveCenter(parent_geometry.center())  # Center the progress dialog to the parent
-            self.progress_dialog.move(dialog_geometry.topLeft())  # Move to the new position
+        # Center the progress dialog relative to the parent window
+        if isinstance(self, QWidget):
+            parent_geometry = self.geometry()
+            dialog_geometry = self.progress_dialog.frameGeometry()
+            dialog_geometry.moveCenter(parent_geometry.center())
+            self.progress_dialog.move(dialog_geometry.topLeft())
 
-        QApplication.processEvents()  # Ensure the UI is responsive
+        QApplication.processEvents()
 
         # Create the worker for updating the modpack
-        self.worker = ModpackUpdateWorker(repo_path)
+        self.worker = ModpackUpdateWorker(repo_url, repo_name, selected_branch, parent_folder)
         self.worker.finished.connect(self.on_update_finished)
 
         # Start the worker (background task)
@@ -2666,21 +2519,25 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.settings = self.load_settings()
         skip_mod_selection = self.settings.get("skip_mod_selection", False)
         modpack_name = self.modpack_var.currentText()
+        selected_branch = self.branch_var.currentText()
         modpack_info = self.get_modpack_info(modpack_name)
+
         if not modpack_info:
             QMessageBox.critical(self, "Error", "Modpack information not found.")
             return
+
+        # Handle repository name and path
+        repo_name = f"{modpack_name}-{selected_branch}" if selected_branch != "main" else modpack_name
+        repo_path = os.path.join(os.getcwd(), "Modpacks", repo_name)
+        mods_src = os.path.join(repo_path, "Mods")
+        install_path = self.mods_dir
+        mod_list = self.get_mod_list(mods_src)
 
         # Handle special cases based on URL type
         if modpack_info['url'].endswith('.git'):
             repo_name = modpack_info['url'].split('/')[-1].replace('.git', '')
         else:
             repo_name = modpack_name.replace(' ', '_')
-
-        repo_path = os.path.join(os.getcwd(), repo_name)
-        mods_src = os.path.join(repo_path, 'Mods')
-        install_path = self.mods_dir
-        mod_list = self.get_mod_list(mods_src)
 
         try:
             # Check if the repository directory exists
@@ -3195,14 +3052,15 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Read excluded mods
         excluded_mods = self.read_preferences()
         modpack_name = self.modpack_var.currentText()
+        selected_branch = self.branch_var.currentText()
+
 
         # Handle special case for "Coonie's Modpack"
         if modpack_name == "Coonie's Modpack":
             repo_path = os.path.join(os.getcwd(), "Coonies-Modpack")
         else:
-            clone_url = self.get_modpack_url(modpack_name)
-            repo_name = clone_url.split('/')[-1].replace('.git', '')
-            repo_path = os.path.join(os.getcwd(), repo_name)
+            repo_name = f"{modpack_name}-{selected_branch}" if selected_branch != "main" else modpack_name
+            repo_path = os.path.join(os.getcwd(),"Modpacks", repo_name)
 
         mods_src = os.path.join(repo_path, 'Mods')
 
@@ -3377,6 +3235,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     # Function to verify the integrity of the 'Mods' folder of the currently selected modpack
     def verify_modpack_integrity(self):
+        """Verify the integrity of the selected modpack."""
         modpack_name = self.modpack_var.currentText()  # Get the name of the selected modpack
 
         # Handle special case for Coonie's Modpack
@@ -3384,16 +3243,20 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             repo_name = "Coonies-Modpack"
         else:
             clone_url = self.get_modpack_url(modpack_name)
+            if not clone_url:
+                QMessageBox.critical(self, "Error", f"URL not found for modpack '{modpack_name}'.")
+                return
             repo_name = clone_url.split('/')[-1].replace('.git', '')
 
-        modpack_folder = os.path.join(os.getcwd(), repo_name, 'Mods')  # Check inside the 'Mods' folder
+        # Ensure the folder is inside the 'Modpacks' directory
+        modpack_folder = os.path.join(os.getcwd(), "Modpacks", repo_name, "Mods")
 
         if not os.path.isdir(modpack_folder):
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("Mods Folder Not Found")
-            msg_box.setText(f"The 'Mods' folder for {modpack_name} is not found.")
-            msg_box.exec()
+            QMessageBox.warning(
+                self,
+                "Mods Folder Not Found",
+                f"The 'Mods' folder for {modpack_name} was not found in '{modpack_folder}'.",
+            )
             return
 
         # Call the verification function to get the list of empty or .git-only folders
@@ -3402,17 +3265,17 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Show the result in a message box
         if empty_or_git_only_folders:
             folder_list = "\n".join(empty_or_git_only_folders)
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Information)
-            msg_box.setWindowTitle("Verification Result")
-            msg_box.setText(f"The following mods are not downloaded correctly. Please attempt reclone:\n\n{folder_list}")
-            msg_box.exec()
+            QMessageBox.information(
+                self,
+                "Verification Result",
+                f"The following mods are not downloaded correctly. Please attempt reclone:\n\n{folder_list}",
+            )
         else:
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Information)
-            msg_box.setWindowTitle("Verification Complete")
-            msg_box.setText(f"All folders in the 'Mods' folder for {modpack_name} are properly populated.")
-            msg_box.exec()
+            QMessageBox.information(
+                self,
+                "Verification Complete",
+                f"All folders in the 'Mods' folder for {modpack_name} are properly populated.",
+            )
 
     def check_versions(self):
         try:
@@ -3635,33 +3498,7 @@ if __name__ == "__main__":
 
     app = QApplication([])  # Initialize the QApplication
 
-    # Download the logo
-    if not os.path.exists(LOGO_PATH):  # Skip download if already exists
-        download_logo(LOGO_URL, LOGO_PATH)
-
-    # Load the logo
-    splash_pixmap = QPixmap(LOGO_PATH)
-    if splash_pixmap.isNull():
-        print(f"Failed to load pixmap from {LOGO_PATH}.")
-        exit(1)
-
-    # Scale the logo
-    splash_pixmap = splash_pixmap.scaled(
-        400, 400, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
-    )
-
-    # Create the splash screen
-    splash = QSplashScreen(splash_pixmap, Qt.WindowType.WindowStaysOnTopHint)
-    splash.showMessage(
-        "Loading Modpack Manager...",
-        Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
-        Qt.GlobalColor.white,
-    )
-    splash.show()
-
     root = ModpackManagerApp()  # No need to pass 'root', since the window is handled by PyQt itself
-
-    splash.finish(root)
 
     # Set global stylesheet to apply a 1pt gray border to all QPushButtons
     app.setStyleSheet("""
