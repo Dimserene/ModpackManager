@@ -1,5 +1,5 @@
 {
-  "latest_version": "1.8.0",
+  "latest_version": "1.7.0",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
   "changelog": "- Allows to switch to different dev branch of the modpack.\n- Prepare for MacOS support.\n- Detect and remove redundent smods installation.",
   "dependencies": {
