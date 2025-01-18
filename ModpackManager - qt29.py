@@ -1413,17 +1413,34 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.exec()
 
     def get_exe_files(self, directory):
-        """Get list of executables or app bundles in the directory."""
+        """Get a list of executables or app bundles in the directory, stripping extensions."""
         try:
-            if system_platform == "Darwin":
-                return [f for f in os.listdir(directory) if f.endswith(".app")]
-            else:
-                return [f for f in os.listdir(directory) if f.endswith(".exe")]
+            # Detect the platform
+            system_platform = platform.system()
+            
+            if system_platform == "Darwin":  # macOS
+                # Fetch .app bundles and strip the extension
+                files = [f for f in os.listdir(directory) if f.endswith(".app") and os.path.isdir(os.path.join(directory, f))]
+                return [os.path.splitext(f)[0] for f in files]
+            else:  # Windows or other platforms
+                # Fetch .exe files and strip the extension
+                files = [f for f in os.listdir(directory) if f.endswith(".exe")]
+                return [os.path.splitext(f)[0] for f in files]
+
         except FileNotFoundError:
+            # Handle the case when the directory is not found
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Critical)
             msg_box.setWindowTitle("Error")
             msg_box.setText(f"Directory not found: {directory}")
+            msg_box.exec()
+            return []
+        except Exception as e:
+            # Handle any unexpected errors
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Critical)
+            msg_box.setWindowTitle("Error")
+            msg_box.setText(f"An unexpected error occurred: {e}")
             msg_box.exec()
             return []
 
