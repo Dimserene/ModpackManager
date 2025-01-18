@@ -1759,27 +1759,26 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.exec()
 
         elif system_platform == "Darwin":  # macOS
-            # Construct the path to the game executable
-            game_executable = os.path.join(self.game_dir, f"{self.profile_name}.exe")
+            # Path to run_lovely.sh
 
             self.game_dir = os.path.abspath(os.path.expanduser(self.settings.get("game_directory")))
-            self.profile_name = self.settings.get("profile_name")        
+            lovely_script = os.path.abspath(os.path.expanduser(f"{self.game_dir}/run_lovely.sh"))       
             self.mods_path = os.path.abspath(os.path.expanduser(self.settings.get("mods_directory")))
             remove_debug_folders(self.mods_path)
 
-            try:
-                # Use Steam to launch the game via its app ID
-                steam_command = "steam://rungameid/2379780"
-                print(f"Launching game via Steam on macOS: {steam_command}")
-                self.process = QProcess(self)
-                self.process.start("open", [steam_command])  # 'open' is the macOS equivalent to xdg-open
-            except Exception as e:
-                # Display an error message if something goes wrong
-                msg_box = QMessageBox()
-                msg_box.setIcon(QMessageBox.Icon.Critical)
-                msg_box.setWindowTitle("Error")
-                msg_box.setText(f"Failed to launch game via Steam on macOS: {e}")
-                msg_box.exec()
+            # Check if the script exists
+            if not os.path.exists(lovely_script):
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"The script 'run_lovely.sh' was not found in the expected location:\n{lovely_script}"
+                )
+                return
+            
+            # Launch the script
+            self.process = QProcess(self)
+            self.process.start("bash", [lovely_script])
+            QMessageBox.information(self, "Game Launched", "The game is launching via 'run_lovely.sh'.")
 
         else:
             # Unsupported platform
