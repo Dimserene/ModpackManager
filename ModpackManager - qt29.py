@@ -677,7 +677,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.settings = self.load_settings()
         self.game_dir = self.settings.get("game_directory")
         self.profile_name = self.settings.get("profile_name")
-        self.mods_dir = os.path.expandvars(self.settings.get("mods_directory"))
+        self.mods_dir = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
         self.selected_modpack = self.settings.get("game_directory")
         self.excluded_mods = self.read_preferences()
 
