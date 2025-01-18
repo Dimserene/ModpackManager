@@ -1298,6 +1298,13 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     # Function to open the directory in file explorer
     def open_directory(self, path):
+        """
+        Opens the specified directory in the file explorer.
+        Supports macOS, Windows, and Linux.
+        """
+        # Expand and normalize the directory path
+        expanded_path = os.path.abspath(os.path.expanduser(path))
+        print(f"Expanded Path: {expanded_path}")
         try:
             # Check if the directory exists, if not create it
             if not os.path.exists(path):
@@ -1312,20 +1319,18 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             # Platform-specific commands to open the directory
             if platform.system() == "Darwin":  # macOS
-                subprocess.run(["open", os.path.abspath(os.path.expanduser(path))], check=True)
+                print(f"Attempting to open directory on macOS: {expanded_path}")
+                subprocess.run(["open", expanded_path], check=True)
             elif platform.system() == "Windows":
-                os.startfile(os.path.expandvars(path))  # Windows uses os.startfile
+                print(f"Attempting to open directory on Windows: {expanded_path}")
+                os.startfile(expanded_path)  # Windows uses os.startfile
+            elif platform.system() == "Linux":
+                print(f"Attempting to open directory on Linux: {expanded_path}")
+                subprocess.run(["xdg-open", expanded_path], check=True)
             else:
-                # For Linux, use the xdg-open command
-                subprocess.run(["xdg-open", path], check=True)
-            
+                QMessageBox.critical(None, "Error", "Unsupported operating system.")
         except Exception as e:
-            # Display an error message if unable to open the directory
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"Failed to open or create directory: {e}")
-            msg_box.exec()
+            QMessageBox.critical(None, "Error", f"Failed to open directory:\n{expanded_path}\nError: {e}")
 
     def set_profile_name(self, profile_name, mods_dir_entry):
         # Construct the new mods directory path based on profile name
