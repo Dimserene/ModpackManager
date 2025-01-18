@@ -2248,8 +2248,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 return
 
             # Check if the install path exists and create it if necessary
-            if not os.path.exists(install_path):
-                os.makedirs(install_path)
+            if not os.path.exists(os.path.abspath(os.path.expanduser(install_path))):
+                os.makedirs(os.path.abspath(os.path.expanduser(install_path)))
 
             if skip_mod_selection:
                 # Install all mods without showing the mod selection popup
