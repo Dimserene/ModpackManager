@@ -2923,7 +2923,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         finally:
             # Ensure mods_path is updated and debug folders are removed
-            mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory", mods_dir)))
+            mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
             remove_debug_folders(mods_path)
 
             # Ensure the installation popup is closed
