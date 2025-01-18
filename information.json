@@ -1,7 +1,7 @@
 {
-  "latest_version": "1.7.0",
-  "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- Allows to switch to different dev branch of the modpack.\n- Prepare for MacOS support.\n- Detect and remove redundent smods installation.",
+  "latest_version": "1.8.0",
+  "download_url": "https://github.com/Dimserene/ModpackManager/releases/",
+  "changelog": "- Allows user to switch to different dev branch of the modpack.\n- MacOS support.\n- Detect and remove redundent smods installation.",
   "dependencies": {
     "7thbeatcards": ["Talisman"],
     "AntonosStakes": ["Talisman"],
