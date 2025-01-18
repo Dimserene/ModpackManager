@@ -2212,7 +2212,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         install_path = (
             os.path.abspath(os.path.expanduser(self.mods_dir))
             if not macos
-            else os.path.expanduser("~/Library/Application Support/Balatro/Mods")
+            else os.path.abspath(os.path.expanduser("~/Library/Application Support/Balatro/Mods"))
         )
         mod_list = self.get_mod_list(mods_src)
 
