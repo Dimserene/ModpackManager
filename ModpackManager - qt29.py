@@ -648,9 +648,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.revert_popup_open = False
         self.install_popup_open = False
 
-        # Initialize custom_install_path as None
-        self.custom_install_path = None
-
         # Initialize metadata as an attribute
         self.metadata = {}
 
@@ -675,9 +672,15 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Load settings (either default or user preferences)
         self.settings = self.load_settings()
-        self.game_dir = self.settings.get("game_directory")
+
+        if system_platform == "Darwin":  # macOS
+            self.game_dir = os.path.abspath(os.path.expanduser(self.settings.get("game_directory", "~/Library/Application Support/Balatro")))
+            self.mods_dir = os.path.abspath(os.path.expanduser(self.settings.get("mods_directory", "~/Library/Application Support/Balatro/Mods")))
+        else:
+            self.game_dir = os.path.abspath(os.path.expandvars(self.settings.get("game_directory", "%AppData%\\Balatro")))
+            self.mods_dir = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory", "%AppData%\\Balatro\\Mods")))
+            
         self.profile_name = self.settings.get("profile_name")
-        self.mods_dir = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
         self.selected_modpack = self.settings.get("default_modpack")
         self.excluded_mods = self.read_preferences()
 
@@ -1144,9 +1147,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Adjust default game directory based on OS
         default_game_dir = self.settings["game_directory"]
         if platform.system() == "Darwin":  # macOS
-            default_game_dir = os.path.abspath(os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/Balatro/"))
-        elif platform.system() == "Windows":
-            default_game_dir = self.settings["game_directory"]
+            default_game_dir = os.path.abspath(os.path.expanduser(self.settings["game_directory"]))
+        else:
+            default_game_dir = os.path.abspath(os.path.expandvars(self.settings["game_directory"]))
 
         # List all .exe files in the game directory and strip ".exe"
         exe_files = self.get_exe_files(default_game_dir, macos=True)
@@ -1333,17 +1336,24 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         except Exception as e:
             QMessageBox.critical(None, "Error", f"Failed to open directory:\n{expanded_path}\nError: {e}")
 
-    def set_profile_name(self, profile_name, mods_dir_entry, macos=False):
+    def set_profile_name(self, profile_name, mods_dir_entry):
         """Set profile name and update mods directory and executable/app."""
         if profile_name:
             # Construct the new mods directory path based on profile name
-            if macos:
-                new_mods_dir = os.path.expanduser(f"~/Library/Application Support/{profile_name}/Mods")
+            system_platform = platform.system()
+
+            if system_platform == "Darwin":  # macOS
+                new_mods_dir = f"~/Library/Application Support/{profile_name}/Mods"
             else:
-                new_mods_dir = os.path.expandvars(f"%AppData%\\{profile_name}\\Mods")
+                new_mods_dir = f"%AppData%\\{profile_name}\\Mods"
 
             self.settings["mods_directory"] = new_mods_dir  # Update the settings
-            self.mods_dir = new_mods_dir
+
+            if system_platform == "Darwin":  # macOS
+                self.mods_dir = os.path.abspath(os.path.expanduser(new_mods_dir))
+            else:
+                self.mods_dir = os.path.abspath(os.path.expandvars(new_mods_dir))
+
 
             # Update the mods_dir_entry to show the new directory
             mods_dir_entry.setReadOnly(False)  # Temporarily make it writable
@@ -1351,8 +1361,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             mods_dir_entry.setReadOnly(True)  # Set back to readonly
 
             # Construct the source and destination paths
-            source_exe = os.path.join(self.game_dir, "balatro.exe" if not macos else "balatro.app")
-            destination_exe = os.path.join(self.game_dir, f"{profile_name}.exe" if not macos else f"{profile_name}.app")
+            source_exe = os.path.join(self.game_dir, "balatro.exe" if system_platform != "Darwin" else "balatro.app")
+            destination_exe = os.path.join(self.game_dir, f"{profile_name}.exe" if system_platform != "Darwin" else f"{profile_name}.app")
 
             # Check if balatro.exe or balatro.app exists, otherwise prompt the user to choose a file
             if not os.path.exists(source_exe):
@@ -1365,9 +1375,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 # Prompt the user to select an executable or app
                 chosen_file, _ = QFileDialog.getOpenFileName(
                     None, 
-                    "Select Executable" if not macos else "Select App", 
+                    "Select Executable" if system_platform != "Darwin" else "Select App", 
                     "", 
-                    "Executable Files (*.exe)" if not macos else "App Bundles (*.app)"
+                    "Executable Files (*.exe)" if system_platform != "Darwin" else "App Bundles (*.app)"
                 )
 
                 if not chosen_file:  # If the user cancels the file selection
@@ -1383,7 +1393,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             # Try copying the executable or app to the new profile name
             try:
-                if macos and os.path.isdir(source_exe):
+                if system_platform == "Darwin" and os.path.isdir(source_exe):
                     shutil.copytree(source_exe, destination_exe, dirs_exist_ok=True)
                 else:
                     shutil.copy2(source_exe, destination_exe)
@@ -1402,12 +1412,13 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.setText(f"Failed to create {os.path.basename(destination_exe)}: {str(e)}")
                 msg_box.exec()
 
-    def get_exe_files(self, directory, macos=False):
+    def get_exe_files(self, directory):
         """Get list of executables or app bundles in the directory."""
         try:
-            if macos:
+            if system_platform == "Darwin":
                 return [f for f in os.listdir(directory) if f.endswith(".app") and os.path.isdir(os.path.join(directory, f))]
-            return [f for f in os.listdir(directory) if f.endswith(".exe")]
+            else:
+                return [f for f in os.listdir(directory) if f.endswith(".exe")]
         except FileNotFoundError:
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Critical)
@@ -1676,9 +1687,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             return
 
         self.settings = self.load_settings()
-        self.game_dir = self.settings.get("game_directory")
+        self.game_dir = os.path.abspath(os.path.expandvars(self.settings.get("game_directory")))
         self.profile_name = self.settings.get("profile_name")        
-        self.mods_path = os.path.expandvars(self.settings.get("mods_directory"))
+        self.mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
         remove_debug_folders(self.mods_path)
 
         # Detect the operating system
@@ -1853,8 +1864,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         return commit_messages
 
     def get_version_info(self):
+
+        # Resolve game and mods directories based on platform
+        system_platform = platform.system()
+
         # Paths for version and modpack name files
-        mods_path = os.path.join(os.path.expandvars(self.mods_dir), "ModpackUtil")
+        if system_platform == "Darwin":  # macOS
+            mods_path = os.path.join(os.path.dirname(os.path.abspath(os.path.expanduser(self.mods_dir))), "ModpackUtil")
+        else:
+            mods_path = os.path.join(os.path.dirname(os.path.abspath(os.path.expandvars(self.mods_dir))), "ModpackUtil")
+
         current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
         modpack_name_file = os.path.join(mods_path, 'ModpackName.txt')
         modpack_util_file = os.path.join(mods_path, 'ModpackUtil.lua')
@@ -1875,11 +1894,18 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         return current_version, pack_name
 
     def update_installed_info(self):
+        """Update the installed modpack information with macOS support."""
         # Load user settings once
         self.settings = self.load_settings()
 
+        # Detect the operating system and resolve the install path
+        system_platform = platform.system()
+        if system_platform == "Darwin":  # macOS
+            install_path = os.path.abspath(os.path.expanduser(self.settings["mods_directory"]))
+        else:
+            install_path = os.path.abspath(os.path.expandvars(self.settings["mods_directory"]))
+
         # Paths for version and modpack name files
-        install_path = os.path.expandvars(self.settings["mods_directory"])
         mods_path = os.path.join(install_path, 'ModpackUtil')
         current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
         modpack_name_file = os.path.join(mods_path, 'ModpackName.txt')
@@ -1892,7 +1918,11 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         pack_name = self.read_file_content(modpack_name_file) or self.extract_pack_name(modpack_util_file)
 
         # Update installed info label with pack name and version
-        info_text = f"Installed pack: {pack_name} ({current_version})" if pack_name else "No modpack installed or ModpackUtil mod removed."
+        info_text = (
+            f"Installed pack: {pack_name} ({current_version})"
+            if pack_name
+            else "No modpack installed or ModpackUtil mod removed."
+        )
         self.installed_info_label.setText(info_text)
         self.installed_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -2248,8 +2278,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 return
 
             # Check if the install path exists and create it if necessary
-            if not os.path.exists(os.path.abspath(os.path.expanduser(install_path))):
-                os.makedirs(os.path.abspath(os.path.expanduser(install_path)))
+            if not os.path.exists(install_path):
+                os.makedirs(install_path)
 
             if skip_mod_selection:
                 # Install all mods without showing the mod selection popup
@@ -2760,20 +2790,40 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         mods_src = os.path.join(repo_path, 'Mods')
 
-        # Check if the Mods directory exists and warn the user
-        if os.path.isdir(self.mods_dir):
-            # Backup existing mods folder if enabled
+        """Check if the Mods directory exists and optionally back it up."""
+        # Resolve platform-specific mods directory path
+        system_platform = platform.system()
+        if system_platform == "Darwin":  # macOS
+            mods_dir = os.path.abspath(os.path.expanduser(self.mods_dir))
+        elif system_platform == "Windows":  # Windows
+            mods_dir = os.path.abspath(os.path.expandvars(self.mods_dir))
+        else:
+            QMessageBox.critical(self, "Error", f"Unsupported platform: {system_platform}")
+            return
+
+        # Check if the Mods directory exists
+        if os.path.isdir(mods_dir):
+            # Determine if backup is enabled
             backup_mods = self.settings.get("backup_mods", False)
-            if hasattr(self, 'backup_checkbox'):  # Use checkbox if available
+            if hasattr(self, "backup_checkbox"):  # Use checkbox state if available
                 backup_mods = self.backup_checkbox.isChecked()
 
             if backup_mods:
+                # Create a timestamped backup folder name
                 timestamp = time.strftime("%Y%m%d-%H%M%S")
-                backup_folder = os.path.join(os.path.dirname(self.mods_dir), f"Mods-backup-{timestamp}")
+                backup_folder = os.path.join(os.path.dirname(mods_dir), f"Mods-backup-{timestamp}")
+
                 try:
-                    shutil.move(self.mods_dir, backup_folder)
+                    # Move the Mods directory to the backup folder
+                    shutil.move(mods_dir, backup_folder)
+                    QMessageBox.information(
+                        self, 
+                        "Backup Successful", 
+                        f"Mods folder successfully backed up to:\n{backup_folder}"
+                    )
                 except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Failed to backup Mods folder. Error: {e}")
+                    # Show error message if backup fails
+                    QMessageBox.critical(self, "Error", f"Failed to backup Mods folder. Error: {str(e)}")
                     return
 
             # Remove existing mods folder if enabled
@@ -2782,19 +2832,36 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 remove_mods = self.remove_checkbox.isChecked()
 
             if remove_mods:
+                # Platform-specific path resolution
+                system_platform = platform.system()
+                if system_platform == "Darwin":  # macOS
+                    mods_dir = os.path.abspath(os.path.expanduser(self.mods_dir))
+                elif system_platform == "Windows":  # Windows
+                    mods_dir = os.path.abspath(os.path.expandvars(self.mods_dir))
+                else:
+                    QMessageBox.critical(self, "Error", f"Unsupported platform: {system_platform}")
+                    return
+
+                # Warning message box
                 msg_box = QMessageBox()
                 msg_box.setIcon(QMessageBox.Icon.Warning)
                 msg_box.setWindowTitle("Warning")
                 msg_box.setText("The current 'Mods' folder will be erased. Do you want to proceed?")
                 msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
                 response = msg_box.exec()
+
                 if response == QMessageBox.StandardButton.No:
                     return
+
                 try:
-                    shutil.rmtree(self.mods_dir, ignore_errors=True)
+                    # Remove the Mods directory
+                    if os.path.exists(mods_dir):
+                        shutil.rmtree(mods_dir, ignore_errors=True)
+                        QMessageBox.information(self, "Success", "The 'Mods' folder has been removed successfully.")
+                    else:
+                        QMessageBox.warning(self, "Warning", "The 'Mods' folder does not exist.")
                 except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Failed to remove Mods folder. Error: {e}")
-                    return
+                    QMessageBox.critical(self, "Error", f"Failed to remove Mods folder. Error: {str(e)}")
 
         # Create a progress dialog
         progress_dialog = QProgressDialog("Installing mods...", "Cancel", 0, 100, self)
@@ -2809,11 +2876,21 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         filtered_mods = [mod for mod in all_mods if mod not in excluded_mods or mod in mandatory_mods]
 
         try:
+            # Resolve mods directory based on platform
+            system_platform = platform.system()
+            if system_platform == "Darwin":  # macOS
+                mods_dir = os.path.abspath(os.path.expanduser(self.mods_dir))
+            elif system_platform == "Windows":  # Windows
+                mods_dir = os.path.abspath(os.path.expandvars(self.mods_dir))
+            else:
+                QMessageBox.critical(self, "Error", f"Unsupported platform: {system_platform}")
+                return
+
             # Iterate through mods and copy them
             total_mods = len(filtered_mods)
             for index, mod in enumerate(filtered_mods, start=1):
                 source_mod_path = os.path.join(mods_src, mod)
-                destination_mod_path = os.path.join(self.mods_dir, mod)
+                destination_mod_path = os.path.join(mods_dir, mod)
 
                 # Update progress dialog
                 progress_percentage = int((index / total_mods) * 100)
@@ -2827,9 +2904,12 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                     return
 
                 # Perform the copy operation
-                if os.path.exists(destination_mod_path):
-                    shutil.rmtree(destination_mod_path)
-                shutil.copytree(source_mod_path, destination_mod_path)
+                try:
+                    if os.path.exists(destination_mod_path):
+                        shutil.rmtree(destination_mod_path)
+                    shutil.copytree(source_mod_path, destination_mod_path)
+                except Exception as copy_error:
+                    QMessageBox.warning(self, "Copy Error", f"Failed to copy {mod}. Error: {copy_error}")
 
             # Close the progress dialog
             progress_dialog.close()
@@ -2842,8 +2922,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             QMessageBox.critical(self, "Error", f"An error occurred during installation: {e}")
 
         finally:
-            self.mods_path = os.path.expandvars(self.settings.get("mods_directory"))
-            remove_debug_folders(self.mods_path)
+            # Ensure mods_path is updated and debug folders are removed
+            mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory", mods_dir)))
+            remove_debug_folders(mods_path)
 
             # Ensure the installation popup is closed
             if popup:
@@ -2857,7 +2938,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         
     def uninstall_modpack(self):
         self.settings = self.load_settings()
-        install_path = self.mods_dir
+        if system_platform == "Darwin":  # macOS
+            install_path = os.path.abspath(os.path.expanduser(self.mods_dir))
+        else:
+            install_path = os.path.abspath(os.path.expandvars(self.mods_dir))
 
         # Confirm the uninstallation
         msg_box = QMessageBox()
@@ -3123,12 +3207,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         system = platform.system()
 
         # Expand and normalize the game directory path
-        game_dir = os.path.abspath(os.path.expanduser(self.game_dir))
 
-        if system == "Windows":
-            lovely_path = os.path.join(game_dir, "version.dll")
-        elif system == "Darwin":  # macOS
+
+        if system == "Darwin":  # macOS
+            game_dir = os.path.abspath(os.path.expanduser(self.game_dir))
             lovely_path = os.path.join(game_dir, "liblovely.dylib")
+        else:
+            game_dir = os.path.abspath(os.path.expandvars(self.game_dir))
+            lovely_path = os.path.join(game_dir, "version.dll")
 
         if not os.path.exists(lovely_path):
             msg_box = QMessageBox()
