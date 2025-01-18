@@ -1135,7 +1135,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Adjust default game directory based on OS
         default_game_dir = self.settings["game_directory"]
         if platform.system() == "Darwin":  # macOS
-            default_game_dir = os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/Balatro/")
+            default_game_dir = os.path.abspath(os.path.expanduser("~/Library/Application Support/Steam/steamapps/common/Balatro/"))
         elif platform.system() == "Windows":
             default_game_dir = self.settings["game_directory"]
 
@@ -1312,7 +1312,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             # Platform-specific commands to open the directory
             if platform.system() == "Darwin":  # macOS
-                subprocess.run(["open", os.path.expanduser(path)], check=True)
+                subprocess.run(["open", os.path.abspath(os.path.expanduser(path))], check=True)
             elif platform.system() == "Windows":
                 os.startfile(os.path.expandvars(path))  # Windows uses os.startfile
             else:
