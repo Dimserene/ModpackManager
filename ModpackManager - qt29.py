@@ -1310,8 +1310,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.setText(f"Directory did not exist, created: {path}")
                 msg_box.exec()
 
-            # Open the directory after ensuring it exists
-            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+            # Platform-specific commands to open the directory
+            if platform.system() == "Darwin":  # macOS
+                subprocess.run(["open", path], check=True)
+            elif platform.system() == "Windows":
+                os.startfile(path)  # Windows uses os.startfile
+            else:
+                # For Linux, use the xdg-open command
+                subprocess.run(["xdg-open", path], check=True)
             
         except Exception as e:
             # Display an error message if unable to open the directory
