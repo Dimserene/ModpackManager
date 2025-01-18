@@ -1895,7 +1895,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
     def play_game(self):
         # Check if Lovely Injector is installed
         if not self.check_lovely_injector_installed():
-            # If the user chooses not to install Lovely Injector, abort launching the game
             QMessageBox.warning(
                 self, 
                 "Cannot Launch Game", 
@@ -1947,6 +1946,30 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.setWindowTitle("Error")
                 msg_box.setText(f"Failed to launch game via Steam: {e}")
                 msg_box.exec()
+
+        elif system_platform == "Darwin":  # macOS
+            try:
+                # Use Steam to launch the game via its app ID
+                steam_command = "steam://rungameid/2379780"
+                print(f"Launching game via Steam on macOS: {steam_command}")
+                self.process = QProcess(self)
+                self.process.start("open", [steam_command])  # 'open' is the macOS equivalent to xdg-open
+            except Exception as e:
+                # Display an error message if something goes wrong
+                msg_box = QMessageBox()
+                msg_box.setIcon(QMessageBox.Icon.Critical)
+                msg_box.setWindowTitle("Error")
+                msg_box.setText(f"Failed to launch game via Steam on macOS: {e}")
+                msg_box.exec()
+
+        else:
+            # Unsupported platform
+            msg_box = QMessageBox()
+            msg_box.setIcon(QMessageBox.Icon.Warning)
+            msg_box.setWindowTitle("Unsupported Platform")
+            msg_box.setText("Your operating system is not supported for launching the game.")
+            msg_box.exec()
+
 
     def apply_coonies_play_button_style(self):
         """ Apply Coonie's Modpack play button color (Purple) """
