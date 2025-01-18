@@ -2436,7 +2436,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         repo_name = f"{modpack_name}-{selected_branch}" if selected_branch != "main" else modpack_name
         repo_path = os.path.join(os.getcwd(), "Modpacks", repo_name)
         mods_src = os.path.join(repo_path, "Mods")
-        install_path = self.mods_dir
+        install_path = os.path.abspath(os.path.expanduser(self.mods_dir))
         mod_list = self.get_mod_list(mods_src)
 
         # Handle special cases based on URL type
@@ -2940,8 +2940,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def write_presets(self, presets):
         """Write presets to the JSON file."""
-        with open("presets.json", "w") as file:
-            json.dump(presets, file, indent=4)
+        # Ensure the settings folder exists
+        if not os.path.exists(SETTINGS_FOLDER):
+            os.makedirs(SETTINGS_FOLDER)  # Create the folder if it doesn't exist
+
+        try:
+            with open(PRESETS_FILE, "w") as file:
+                json.dump(presets, file, indent=4)
+            print(f"Presets saved to {PRESETS_FILE}")
+        except Exception as e:
+            print(f"Error saving presets: {e}")
 
     def update_presets_dropdown(self):
         """Update the presets dropdown with the available presets."""
@@ -2959,7 +2967,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         excluded_mods = self.read_preferences()
         modpack_name = self.modpack_var.currentText()
         selected_branch = self.branch_var.currentText()
-
 
         # Handle special case for "Coonie's Modpack"
         if modpack_name == "Coonie's Modpack":
