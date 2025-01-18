@@ -56,7 +56,14 @@ elif system_platform == "Darwin":
     }
 
 # File paths for settings and installation exclusions
-SETTINGS_FOLDER = os.path.expandvars("%AppData%\\Balatro\\ManagerSettings")  # Replace with the correct path if different
+# Determine the correct settings folder based on the operating system
+if platform.system() == "Windows":
+    SETTINGS_FOLDER = os.path.abspath(os.path.expandvars(r"%AppData%\Balatro\ManagerSettings"))
+elif platform.system() == "Darwin":  # macOS
+    SETTINGS_FOLDER = os.path.abspath(os.path.expanduser("~/Library/Application Support/Balatro/ManagerSettings"))
+else:  # Assume Linux or other Unix-like OS
+    SETTINGS_FOLDER = os.path.abspath(os.path.expanduser("~/.balatro/ManagerSettings"))
+    
 SETTINGS_FILE = os.path.join(SETTINGS_FOLDER, "user_settings.json")
 INSTALL_FILE = os.path.join(SETTINGS_FOLDER, "excluded_mods.json")
 FAVORITES_FILE = os.path.join(SETTINGS_FOLDER, "favorites.json")
@@ -621,6 +628,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
     def __init__(self, *args, **kwargs):
         super(ModpackManagerApp, self).__init__(*args, **kwargs)
         self.setWindowTitle("Dimserene's Modpack Manager")
+
+        download_logo(LOGO_URL, LOGO_PATH)
 
         # Load the splash screen
         splash_pixmap = QPixmap(LOGO_PATH).scaled(
