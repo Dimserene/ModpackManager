@@ -2790,10 +2790,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                     QMessageBox.critical(self, "Error", f"Failed to remove Mods folder. Error: {e}")
                     return
 
-        # Ensure the install directory exists
-        if not os.path.exists(self.mods_dir):
-            os.makedirs(self.mods_dir)
-
         # Create a progress dialog
         progress_dialog = QProgressDialog("Installing mods...", "Cancel", 0, 100, self)
         progress_dialog.setWindowTitle("Installation Progress")
