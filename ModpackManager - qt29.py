@@ -1687,10 +1687,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             return
 
         self.settings = self.load_settings()
-        self.game_dir = os.path.abspath(os.path.expandvars(self.settings.get("game_directory")))
-        self.profile_name = self.settings.get("profile_name")        
-        self.mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
-        remove_debug_folders(self.mods_path)
+
 
         # Detect the operating system
         system_platform = platform.system()
@@ -1698,6 +1695,11 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         if system_platform == "Windows":
             # Construct the path to the game executable
             game_executable = os.path.join(self.game_dir, f"{self.profile_name}.exe")
+
+            self.game_dir = os.path.abspath(os.path.expandvars(self.settings.get("game_directory")))
+            self.profile_name = self.settings.get("profile_name")        
+            self.mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
+            remove_debug_folders(self.mods_path)
 
             try:
                 # Check if the executable exists
@@ -1717,6 +1719,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.exec()
 
         elif system_platform == "Linux":
+            # Construct the path to the game executable
+            game_executable = os.path.join(self.game_dir, f"{self.profile_name}.exe")
+
+            self.game_dir = os.path.abspath(os.path.expandvars(self.settings.get("game_directory")))
+            self.profile_name = self.settings.get("profile_name")        
+            self.mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
+            remove_debug_folders(self.mods_path)
+
             try:
                 # Use Steam to launch the game via its app ID
                 steam_command = "steam://rungameid/2379780"
@@ -1732,6 +1742,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.exec()
 
         elif system_platform == "Darwin":  # macOS
+            # Construct the path to the game executable
+            game_executable = os.path.join(self.game_dir, f"{self.profile_name}.exe")
+
+            self.game_dir = os.path.abspath(os.path.expanduser(self.settings.get("game_directory")))
+            self.profile_name = self.settings.get("profile_name")        
+            self.mods_path = os.path.abspath(os.path.expanduser(self.settings.get("mods_directory")))
+            remove_debug_folders(self.mods_path)
+
             try:
                 # Use Steam to launch the game via its app ID
                 steam_command = "steam://rungameid/2379780"
@@ -2923,7 +2941,12 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         finally:
             # Ensure mods_path is updated and debug folders are removed
-            mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
+            system_platform = platform.system()
+            if system_platform == "Darwin":  # macOS
+                mods_path = os.path.abspath(os.path.expanduser(self.settings.get("mods_directory")))
+            else:
+                mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
+
             remove_debug_folders(mods_path)
 
             # Ensure the installation popup is closed
