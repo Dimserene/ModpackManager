@@ -678,7 +678,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.game_dir = self.settings.get("game_directory")
         self.profile_name = self.settings.get("profile_name")
         self.mods_dir = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
-        self.selected_modpack = self.settings.get("game_directory")
+        self.selected_modpack = self.settings.get("default_modpack")
         self.excluded_mods = self.read_preferences()
 
         # Declare default versions
@@ -1278,7 +1278,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         
         # Reset game directory
         game_dir_entry.setReadOnly(False)
-        game_dir_entry.setText(self.settings["game_directory"])
+        game_dir_entry.setText(os.path.expandvars(self.settings["game_directory"]))
         game_dir_entry.setReadOnly(True)
 
         # Reset mods directory
@@ -1293,16 +1293,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
     def browse_directory(self, entry_widget, readonly):
         folder_selected = QFileDialog.getExistingDirectory(self, "Select Directory")
         if folder_selected:
-            # Temporarily make the entry writable
-            if readonly:
-                entry_widget.setReadOnly(False)
-
             # Update the entry with the selected folder path
             entry_widget.setText(folder_selected)
-
-            # If it was readonly before, set it back to readonly
-            if readonly:
-                entry_widget.setReadOnly(True)
 
 
     # Function to open the directory in file explorer
@@ -1341,10 +1333,15 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         except Exception as e:
             QMessageBox.critical(None, "Error", f"Failed to open directory:\n{expanded_path}\nError: {e}")
 
-    def set_profile_name(self, profile_name, mods_dir_entry):
-        # Construct the new mods directory path based on profile name
+    def set_profile_name(self, profile_name, mods_dir_entry, macos=False):
+        """Set profile name and update mods directory and executable/app."""
         if profile_name:
-            new_mods_dir = os.path.expandvars(f"%AppData%\\{profile_name}\\Mods")
+            # Construct the new mods directory path based on profile name
+            if macos:
+                new_mods_dir = os.path.expanduser(f"~/Library/Application Support/{profile_name}/Mods")
+            else:
+                new_mods_dir = os.path.expandvars(f"%AppData%\\{profile_name}\\Mods")
+
             self.settings["mods_directory"] = new_mods_dir  # Update the settings
             self.mods_dir = new_mods_dir
 
@@ -1354,38 +1351,47 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             mods_dir_entry.setReadOnly(True)  # Set back to readonly
 
             # Construct the source and destination paths
-            source_exe = os.path.join(self.game_dir, "balatro.exe")
-            destination_exe = os.path.join(self.game_dir, f"{profile_name}.exe")
+            source_exe = os.path.join(self.game_dir, "balatro.exe" if not macos else "balatro.app")
+            destination_exe = os.path.join(self.game_dir, f"{profile_name}.exe" if not macos else f"{profile_name}.app")
 
-            # Check if balatro.exe exists, otherwise prompt the user to choose a file
+            # Check if balatro.exe or balatro.app exists, otherwise prompt the user to choose a file
             if not os.path.exists(source_exe):
                 msg_box = QMessageBox()
                 msg_box.setIcon(QMessageBox.Icon.Warning)
                 msg_box.setWindowTitle("File Not Found")
-                msg_box.setText("balatro.exe not found in the game directory. Please choose an executable file to copy.")
+                msg_box.setText(f"{os.path.basename(source_exe)} not found in the game directory. Please choose a file to copy.")
                 msg_box.exec()
 
-                # Prompt the user to select an executable file
-                chosen_file, _ = QFileDialog.getOpenFileName(None, "Select Executable", "", "Executable Files (*.exe)")
+                # Prompt the user to select an executable or app
+                chosen_file, _ = QFileDialog.getOpenFileName(
+                    None, 
+                    "Select Executable" if not macos else "Select App", 
+                    "", 
+                    "Executable Files (*.exe)" if not macos else "App Bundles (*.app)"
+                )
 
                 if not chosen_file:  # If the user cancels the file selection
                     msg_box = QMessageBox()
                     msg_box.setIcon(QMessageBox.Icon.Information)
                     msg_box.setWindowTitle("Operation Cancelled")
-                    msg_box.setText("No executable file selected. Profile creation aborted.")
+                    msg_box.setText("No file selected. Profile creation aborted.")
                     msg_box.exec()
                     return  # Abort the operation if no file is selected
 
                 # Set the source_exe to the chosen file
                 source_exe = chosen_file
 
-            # Try copying the executable file to the new profile name
+            # Try copying the executable or app to the new profile name
             try:
-                shutil.copy2(source_exe, destination_exe)
+                if macos and os.path.isdir(source_exe):
+                    shutil.copytree(source_exe, destination_exe, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(source_exe, destination_exe)
+
                 msg_box = QMessageBox()
                 msg_box.setIcon(QMessageBox.Icon.Information)
                 msg_box.setWindowTitle("Success")
-                msg_box.setText(f"Profile executable {profile_name}.exe created successfully!")
+                msg_box.setText(f"Profile file {os.path.basename(destination_exe)} created successfully!")
                 msg_box.exec()
 
             except Exception as e:
@@ -1393,15 +1399,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box = QMessageBox()
                 msg_box.setIcon(QMessageBox.Icon.Critical)
                 msg_box.setWindowTitle("Error")
-                msg_box.setText(f"Failed to create {profile_name}.exe: {str(e)}")
+                msg_box.setText(f"Failed to create {os.path.basename(destination_exe)}: {str(e)}")
                 msg_box.exec()
 
-
-    # Function to get .exe files and strip the extension
     def get_exe_files(self, directory, macos=False):
+        """Get list of executables or app bundles in the directory."""
         try:
             if macos:
-                return [f for f in os.listdir(directory) if f.endswith(".app")]
+                return [f for f in os.listdir(directory) if f.endswith(".app") and os.path.isdir(os.path.join(directory, f))]
             return [f for f in os.listdir(directory) if f.endswith(".exe")]
         except FileNotFoundError:
             msg_box = QMessageBox()
@@ -1410,252 +1415,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.setText(f"Directory not found: {directory}")
             msg_box.exec()
             return []
-
-############################################################
-# Foundation of time travel popup
-############################################################
-
-    def open_revert_popup(self):
-        selected_modpack = self.modpack_var.currentText()
-
-        # Check if the selected modpack is "Coonie's Modpack"
-        if selected_modpack == "Coonie's Modpack":
-            # Show a popup message and prevent closing the window
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Warning)
-            msg_box.setWindowTitle("Incompatible Modpack")
-            msg_box.setText("This function is not compatible with Coonie's Modpack!")
-            msg_box.exec()
-            return []
-
-        # Prevent opening multiple time travel popups
-        if self.revert_popup_open:
-            return
-
-        # Mark the time travel popup as open
-        self.revert_popup_open = True
-
-        # Create a new popup window
-        popup = QDialog(self)
-        popup.setWindowTitle("Time Machine")
-
-        # Create a layout for the popup window
-        layout = QGridLayout(popup)
-
-        # Label for selecting the version
-        self.old_version_label = QLabel("Select version to time travel:", popup)
-        layout.addWidget(self.old_version_label, 0, 0, 1, 2)
-
-        # Fetch all available versions (commit messages)
-        commit_versions = self.get_all_commit_versions()
-
-        # Dropdown menu to select version
-        self.version_var = QComboBox(popup)
-        self.version_var.addItems(commit_versions)
-        layout.addWidget(self.version_var, 1, 0, 1, 2)
-
-        if commit_versions:
-            self.version_var.setCurrentIndex(0)  # Set the default selection to the first version
-
-        # Submit Button to find the commit hash
-        submit_button = QPushButton("Submit", popup)
-        submit_button.clicked.connect(self.submit_version)
-        layout.addWidget(submit_button, 2, 0, 1, 2)
-
-        # Result Label for Commit Hash
-        self.hash_title_label = QLabel("Hash:", popup)
-        self.hash_title_label.setStyleSheet("color: gray;")
-        layout.addWidget(self.hash_title_label, 3, 0, 1, 1)
-
-        self.version_hash_label = QLabel("", popup)
-        self.version_hash_label.setStyleSheet("color: gray;")
-        layout.addWidget(self.version_hash_label, 4, 0, 1, 2)
-
-        # Button to Revert to Current
-        self.current_button = QPushButton("Revert to Current", popup)
-        self.current_button.clicked.connect(self.switch_back_to_main)
-        layout.addWidget(self.current_button, 5, 0, 1, 1)
-        
-        # Button to Revert to Commit
-        self.time_travel_button = QPushButton("Time Travel", popup)
-        self.time_travel_button.setEnabled(False)  # Initially disabled
-        self.time_travel_button.clicked.connect(self.revert_version)
-        layout.addWidget(self.time_travel_button, 5, 1, 1, 1)
-
-        # Close event handler to reset the flag when the window is closed
-        def revert_on_close():
-            self.revert_popup_open = False
-            popup.close()
-
-        # Connect the close event to the handler
-        popup.finished.connect(revert_on_close)
-
-        # Set the fixed width of the popup
-        popup.setFixedWidth(400)
-
-        # Show the dialog as modal
-        popup.exec()
-
-
-############################################################
-# Time travel functions
-############################################################
-
-    def get_all_commit_versions(self, limit_to_commit=None):
-        modpack_name = self.modpack_var.currentText()
-        repo_path = os.path.join(os.getcwd(), modpack_name)
-        commit_versions = []
-
-        try:
-            # Initialize the repository
-            repo = git.Repo(repo_path)
-
-            # Get the first line of each commit message
-            for commit in repo.iter_commits():
-                commit_first_line = commit.message.split("\n", 1)[0]
-                commit_versions.append(commit_first_line)
-
-                # If limit_to_commit is provided, stop fetching commits once we hit this commit
-                if limit_to_commit and (commit.hexsha == limit_to_commit or commit_first_line == limit_to_commit):
-                    break
-
-            return commit_versions
-        
-        except git.exc.InvalidGitRepositoryError:
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText("Invalid Git repository.")
-            msg_box.exec()
-            return []
-        
-        except Exception as e:
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"Failed to fetch commit versions: {str(e)}")
-            msg_box.exec()
-            return []
-
-    def submit_version(self):
-        # Store user input version in self.old_version
-        self.old_version = self.version_var.currentText()
-
-        # Fetch the commit hash based on user input
-        self.find_commit(self.old_version)
-
-    def find_commit(self, old_version):
-        modpack_name = self.modpack_var.currentText()
-        repo_path = os.path.join(os.getcwd(), modpack_name)
-
-        if not os.path.exists(repo_path):
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText("The modpack not found. Please download first.")
-            msg_box.exec()
-            return
-
-        # Fetch the commit hash by the version message
-        commit_hash = self.find_commit_hash_by_message(old_version)
-
-        # If commit hash found, update the label and enable the time travel button
-        if commit_hash:
-            if commit_hash.startswith("Error"):
-                msg_box = QMessageBox()
-                msg_box.setIcon(QMessageBox.Icon.Critical)
-                msg_box.setWindowTitle("Error")
-                msg_box.setText(commit_hash)
-                msg_box.exec()
-            else:
-                self.version_hash_label.setText(f"{commit_hash}")
-                self.version_hash_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.time_travel_button.setEnabled(True)  # Enable the time travel button
-
-        else:
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Information)
-            msg_box.setWindowTitle("Not Found")
-            msg_box.setText(f"No commit found with version: {old_version}")
-            msg_box.exec()
-
-    def find_commit_hash_by_message(self, commit_message):
-        modpack_name = self.modpack_var.currentText()
-        repo_path = os.path.join(os.getcwd(), modpack_name)
-        
-        try:
-            # Initialize the repository
-            repo = git.Repo(repo_path)
-
-            # Iterate through the commits and search for the commit message
-            for commit in repo.iter_commits():
-                # Git allows multiline commit messages, so we'll compare only the first line
-                commit_first_line = commit.message.split("\n", 1)[0]
-                if re.fullmatch(commit_message, commit_first_line):
-                    return commit.hexsha
-
-            return None
-        except git.exc.InvalidGitRepositoryError:
-            return "Error: Invalid Git repository."
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def revert_version(self):
-        modpack_name = self.modpack_var.currentText()
-        repo_path = os.path.join(os.getcwd(), modpack_name)
-        old_version = self.version_var.currentText()
-
-        # Get the correct commit hash from the version_hash_label
-        commit_hash = self.version_hash_label.text()
-
-        try:
-            repo = git.Repo(repo_path)
-
-            # Perform git switch --detach to detach HEAD
-            repo.git.switch('--detach')
-
-            # Perform the git reset --hard <hash>
-            repo.git.reset('--hard', commit_hash)
-
-            # Show success message
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Information)
-            msg_box.setWindowTitle("Success")
-            msg_box.setText(f"Time traveled to version: {old_version}, please install again.")
-            msg_box.exec()
-
-        except Exception as e:
-            # Show error message
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"Failed to time travel: {str(e)}")
-            msg_box.exec()
-
-    def switch_back_to_main(self):
-        modpack_name = self.modpack_var.currentText()
-        repo_path = os.path.join(os.getcwd(), modpack_name)
-
-        try:
-            repo = git.Repo(repo_path)
-            
-            # Perform git switch main to switch back to the main branch
-            repo.git.switch('main')
-
-            # Show success message
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Information)
-            msg_box.setWindowTitle("Success")
-            msg_box.setText("Travelled back to current.")
-            msg_box.exec()
-
-        except Exception as e:
-            # Show error message
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"Failed to travel back to current: {str(e)}")
-            msg_box.exec()
 
 ############################################################
 # Foundation of Backup popup and functions
@@ -1769,13 +1528,24 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             print("Backup timer was not active.")  # Debugging info
             QMessageBox.information(parent_widget, "Auto Backup", "Backup timer was not active.")
 
+    def get_backup_dir(self, macos=False):
+        """Get the backup directory path based on the platform."""
+        if macos:
+            return os.path.expanduser("~/Library/Application Support/Balatro/1/autosave")
+        return os.path.expandvars("%AppData%\\Balatro\\1\\autosave")
 
-    def perform_backup(self):
-        """Perform the backup task"""
+    def get_save_file_path(self, macos=False):
+        """Get the save file path based on the platform."""
+        if macos:
+            return os.path.expanduser("~/Library/Application Support/Balatro/1/save.jkr")
+        return os.path.expandvars("%AppData%\\Balatro\\1\\save.jkr")
+
+    def perform_backup(self, macos=False):
+        """Perform the backup task."""
         try:
             # Define paths
-            save_file_path = os.path.expandvars("%AppData%\\Balatro\\1\\save.jkr")
-            backup_dir = os.path.expandvars("%AppData%\\Balatro\\1\\autosave")
+            save_file_path = self.get_save_file_path(macos)
+            backup_dir = self.get_backup_dir(macos)
 
             # Ensure the backup directory exists
             if not os.path.exists(backup_dir):
@@ -1793,9 +1563,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         except Exception as e:
             print(f"Backup failed: {str(e)}")  # Debugging info
 
-    def update_backup_dropdown(self, dropdown):
-        """Update the dropdown with the list of backups"""
-        backup_dir = os.path.expandvars("%AppData%\\Balatro\\1\\autosave")
+    def update_backup_dropdown(self, dropdown, macos=False):
+        """Update the dropdown with the list of backups."""
+        backup_dir = self.get_backup_dir(macos)
         if not os.path.exists(backup_dir):
             os.makedirs(backup_dir)
 
@@ -1805,16 +1575,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         for backup in backup_files:
             dropdown.addItem(backup)
 
-    def restore_backup(self, backup_file):
-        """Backup the current save and restore the selected backup"""
+    def restore_backup(self, backup_file, macos=False):
+        """Backup the current save and restore the selected backup."""
         try:
             # Define paths
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            save_file_path = os.path.expandvars("%AppData%\\Balatro\\1\\save.jkr")
-            backup_dir = os.path.expandvars("%AppData%\\Balatro\\1\\autosave")
+            save_file_path = self.get_save_file_path(macos)
+            backup_dir = self.get_backup_dir(macos)
             backup_file_path = os.path.join(backup_dir, backup_file)
 
-            # Backup current save.jkr as save.jkr.bk (if exist, suffix number)
+            # Backup current save.jkr as save.jkr.bk (if exists, suffix number)
             backup_save_path = os.path.join(backup_dir, f"save-{timestamp}-bk.jkr")
             counter = 1
             while os.path.exists(backup_save_path):
@@ -1842,17 +1612,20 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.setText(f"Failed to restore backup: {str(e)}")
             msg_box.exec()
 
-    def delete_all_backups(self):
+    def delete_all_backups(self, macos=False):
         """Delete all backup saves with a confirmation prompt."""
         try:
             # Prompt the user for confirmation
-            reply = QMessageBox.question(self, "Confirm Deletion", 
-                                        "Are you sure you want to delete all backup saves?",
-                                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            reply = QMessageBox.question(
+                self, 
+                "Confirm Deletion", 
+                "Are you sure you want to delete all backup saves?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
 
             # Check if the user clicked 'Yes'
             if reply == QMessageBox.StandardButton.Yes:
-                backup_dir = os.path.expandvars("%AppData%\\Balatro\\1\\autosave")
+                backup_dir = self.get_backup_dir(macos)
 
                 for backup_file in os.listdir(backup_dir):
                     file_path = os.path.join(backup_dir, backup_file)
@@ -1867,7 +1640,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.exec()
 
                 # Update the dropdown after deletion
-                self.update_backup_dropdown(self.backup_dropdown)
+                self.update_backup_dropdown(self.backup_dropdown, macos)
 
             else:
                 print("Deletion canceled.")
@@ -1880,9 +1653,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             msg_box.setText(f"Failed to delete backups: {str(e)}")
             msg_box.exec()
 
-    def open_backup_folder(self):
-        """Open the folder containing the backups"""
-        backup_dir = os.path.expandvars("%AppData%\\Balatro\\1\\autosave")
+    def open_backup_folder(self, macos=False):
+        """Open the folder containing the backups."""
+        backup_dir = self.get_backup_dir(macos)
         if not os.path.exists(backup_dir):
             os.makedirs(backup_dir)
 
@@ -2421,7 +2194,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             self.install_modpack()
 
 
-    def install_modpack(self):
+    def install_modpack(self, macos=False):
         self.settings = self.load_settings()
         skip_mod_selection = self.settings.get("skip_mod_selection", False)
         modpack_name = self.modpack_var.currentText()
@@ -2436,14 +2209,18 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         repo_name = f"{modpack_name}-{selected_branch}" if selected_branch != "main" else modpack_name
         repo_path = os.path.join(os.getcwd(), "Modpacks", repo_name)
         mods_src = os.path.join(repo_path, "Mods")
-        install_path = os.path.abspath(os.path.expanduser(self.mods_dir))
+        install_path = (
+            os.path.abspath(os.path.expanduser(self.mods_dir))
+            if not macos
+            else os.path.expanduser("~/Library/Application Support/Balatro/Mods")
+        )
         mod_list = self.get_mod_list(mods_src)
 
         # Handle special cases based on URL type
-        if modpack_info['url'].endswith('.git'):
-            repo_name = modpack_info['url'].split('/')[-1].replace('.git', '')
+        if modpack_info["url"].endswith(".git"):
+            repo_name = modpack_info["url"].split("/")[-1].replace(".git", "")
         else:
-            repo_name = modpack_name.replace(' ', '_')
+            repo_name = modpack_name.replace(" ", "_")
 
         try:
             # Check if the repository directory exists
