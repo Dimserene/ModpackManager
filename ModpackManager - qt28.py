@@ -12,7 +12,7 @@ import pandas as pd
 # Detect OS and set default settings
 ############################################################
 
-DATE = "2025/01/17"
+DATE = "2025/01/18"
 ITERATION = "28"
 VERSION = Version("1.8.0")  # Current version of the Modpack Manager
 
@@ -801,6 +801,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             QMessageBox.critical(self, "Error", "Failed to load modpack data. Please check your internet connection.")
             self.modpack_data = {"modpack_categories": []}  # Use empty data as a fallback
 
+        self.branch_data = {}        # Dictionary to store branches for each modpack
+        self.initialize_branches()   # List all branches on startup
+
         # Load favorite mods
         self.favorite_mods = set()  # Initialize favorites
         self.load_favorites()  # Load favorites on startup
@@ -910,6 +913,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         else:
             self.apply_default_play_button_style()  # Green for other modpacks
 
+    def initialize_branches(self):
+        """Lists all branches for each modpack and stores them."""
+        for category in self.modpack_data.get("modpack_categories", []):
+            for modpack in category.get("modpacks", []):
+                modpack_name = modpack["name"]
+                self.branch_data[modpack_name] = self.list_branches(modpack_name, modpack_data)
+
+        print("Branch data initialized:")
+        for modpack, branches in self.branch_data.items():
+            print(f"{modpack}: {branches}")
 
 ############################################################
 # Foundation of root window
@@ -922,6 +935,19 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 for modpack in category.get('modpacks', []):
                     modpack_names.append(modpack['name'])
         return modpack_names
+    
+    def list_branches(self, modpack_name, modpack_data):
+        """Lists all branches of a given modpack from the JSON data."""
+        for category in modpack_data.get("modpack_categories", []):
+            for modpack in category.get("modpacks", []):
+                if modpack["name"] == modpack_name:
+                    # If "branches" is defined in the JSON, return them
+                    if "branches" in modpack:
+                        return modpack["branches"]
+                    else:
+                        # Assume only the "main" branch if not defined
+                        return ["main"]
+        return []
 
     def create_widgets(self):
         layout = QGridLayout()
@@ -969,6 +995,13 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         self.modpack_var = QComboBox(self)
         self.modpack_var.addItems(modpack_names)
+        layout.addWidget(self.modpack_var, 4, 1, 1, 3)
+
+        self.branch_var = QComboBox(self)
+        layout.addWidget(self.branch_var, 4, 4, 1, 2)
+
+        # Connect modpack change to update branches
+        self.modpack_var.currentIndexChanged.connect(self.update_branch_dropdown)
 
         # Descriptions
         self.description_label = QLabel("", self)
@@ -1002,8 +1035,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Connect the currentIndexChanged signal to the modpack change handler
         self.modpack_var.currentIndexChanged.connect(self.on_modpack_changed)
-
-        layout.addWidget(self.modpack_var, 4, 1, 1, 5)
 
         # Quick Update button
         self.update_button = QPushButton("Quick Update", self)
@@ -1160,6 +1191,20 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             f"font: 16pt 'Helvetica'; "
             f"color: {color_hex};"
         )
+
+    def update_branch_dropdown(self):
+        """Update branch dropdown based on the selected modpack."""
+        selected_modpack = self.modpack_var.currentText()
+        branches = self.branch_data.get(selected_modpack, [])
+
+        if branches:
+            self.branch_var.clear()
+            self.branch_var.addItems(branches)
+            
+    def get_repo_url(self, modpack_name):
+        """Returns the Git URL for the selected modpack."""
+        return self.modpack_data.get(modpack_name, {}).get("url", "")
+
 
 ############################################################
 # Multi Mode

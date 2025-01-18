@@ -1,12 +1,16 @@
 {
-  "latest_version": "1.7.0",
+  "latest_version": "1.8.0",
   "download_url": "https://github.com/Dimserene/ModpackManager/releases/latest/download/ModpackManager.exe",
-  "changelog": "- New logo splash.\n- Allows saving and managing custom presets.\n- Offline mode.",
+  "changelog": "- Allows to switch to different dev branch of the modpack.",
   "dependencies": {
+    "7thbeatcards": ["Talisman"],
     "AntonosStakes": ["Talisman"],
     "Bmjokers": ["Bmwallet"],
+    "Buffoonery": ["Talisman"],
     "Cryptid": ["Talisman"],
+    "Emporium": ["Talisman"],
     "Familiar": ["Talisman"],
+    "Fortlatro": ["Talisman"],
     "Gemstones": ["Talisman"],
     "Jestobiology": ["Fusion-Jokers"],
     "JoJokers": ["Talisman"],
@@ -17,7 +21,8 @@
     "TOGAPackBalatro": ["Talisman"],
     "TatteredDecks": ["Galdur"],
     "Tsunami": ["Fusion-Jokers"],
-    "Vultbines_Joker": ["Fusion-Jokers"]
+    "Vultbines_Joker": ["Fusion-Jokers"],
+    "Zone-Balatro": ["Talisman"]
   },
 
   "modpack_categories": [
@@ -27,7 +32,8 @@
         {
           "name": "Dimserenes-Modpack",
           "url": "https://github.com/Dimserene/Dimserenes-Modpack.git",
-          "description": "A full-featured modpack including as many mods as possible."
+          "description": "A full-featured modpack including as many mods as possible.",
+          "branches": ["main", "Talisman"]
         },
         {
           "name": "Fine-tuned-Pack",
