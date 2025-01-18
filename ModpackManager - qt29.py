@@ -2687,10 +2687,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
     # Load favorites from the file
     def load_favorites(self):
         """Load favorite mods from a JSON file."""
-        favorites_file = "favorites.json"  # Path to favorites file
         try:
-            if os.path.exists(favorites_file):
-                with open(favorites_file, "r") as f:
+            if os.path.exists(FAVORITES_FILE):
+                with open(FAVORITES_FILE, "r") as f:
                     self.favorite_mods = set(json.load(f))  # Load favorites into a set
             else:
                 self.favorite_mods = set()  # Initialize as an empty set if the file doesn't exist
