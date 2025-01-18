@@ -3240,11 +3240,13 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             archive_name = "lovely-injector.zip"
             extracted_files = ["version.dll"]
 
-        archive_path = os.path.join(self.game_dir, archive_name)
+        # Expand and normalize the game directory path
+        game_dir = os.path.abspath(os.path.expanduser(self.game_dir))
+        archive_path = os.path.join(game_dir, archive_name)
 
         # Verify existence of the game executable
         game_exe = "Balatro.app" if system == "Darwin" else "balatro.exe"
-        game_path = os.path.join(self.game_dir, game_exe)
+        game_path = os.path.join(game_dir, game_exe)
         if not os.path.exists(game_path):
             warning_box = QMessageBox()
             warning_box.setIcon(QMessageBox.Icon.Warning)
@@ -3270,7 +3272,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                     tar.extractall(self.game_dir)
 
             # Verify extracted files
-            missing_files = [f for f in extracted_files if not os.path.exists(os.path.join(self.game_dir, f))]
+            missing_files = [f for f in extracted_files if not os.path.exists(os.path.join(game_dir, f))]
             if missing_files:
                 raise FileNotFoundError(f"Missing files after extraction: {', '.join(missing_files)}")
 
@@ -3296,13 +3298,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
     def check_lovely_injector_installed(self):
         """Check if Lovely Injector is installed and prompt the user to install if not."""
         system = platform.system()
+
+        # Expand and normalize the game directory path
+        game_dir = os.path.abspath(os.path.expanduser(self.game_dir))
+
         if system == "Windows":
-            lovely_path = os.path.join(self.game_dir, "version.dll")
+            lovely_path = os.path.join(game_dir, "version.dll")
         elif system == "Darwin":  # macOS
-            lovely_path = os.path.join(self.game_dir, "liblovely.dylib")
-        else:
-            QMessageBox.critical(None, "Error", "Unsupported platform.")
-            return False
+            lovely_path = os.path.join(game_dir, "liblovely.dylib")
 
         if not os.path.exists(lovely_path):
             msg_box = QMessageBox()
