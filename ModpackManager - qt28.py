@@ -321,10 +321,11 @@ class ModpackDownloadWorker(QThread):
     finished = pyqtSignal(bool, str)
     progress = pyqtSignal(int)  # Signal to update progress (optional)
 
-    def __init__(self, clone_url, repo_name, force_update=False):
+    def __init__(self, clone_url, repo_name, branch_name, force_update=False):
         super().__init__()
         self.clone_url = clone_url
         self.repo_name = os.path.join(os.getcwd(), "Modpacks", repo_name)
+        self.branch_name = branch_name
         self.force_update = force_update
         self.process = None  # Store the QProcess instance
 
@@ -349,85 +350,62 @@ class ModpackDownloadWorker(QThread):
                     return
 
             if self.clone_url.endswith('.git'):
-                # Clone the repository using Git
+                # Clone the repository using the selected branch
+                git_command = ["git", "clone", "--branch", self.branch_name, "--recurse-submodules", "--remote-submodules", self.clone_url, self.repo_name]
                 self.process = QProcess()
-                self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)  # Merge stdout and stderr
-                git_command = ["git", "clone", "--recurse-submodules", "--remote-submodules", self.clone_url, self.repo_name]
+                self.process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
                 
                 # Connect QProcess signals for dynamic output handling
                 self.process.finished.connect(self.git_finished)
-                self.process.readyReadStandardOutput.connect(self.capture_stdout)
-                self.process.readyReadStandardError.connect(self.capture_stderr)
+                self.process.readyReadStandardOutput.connect(self.read_git_output)
                 self.process.start(git_command[0], git_command[1:])
-                self.process.waitForFinished()
+                self.process.waitForFinished(-1)
             else:
-                # Download the file
-                self.download_file()
+                # Download the file (this part will still emit the success message)
+                response = requests.get(self.clone_url, stream=True)
+                if response.status_code != 200:
+                    self.finished.emit(False, f"File download failed: HTTP status {response.status_code}.")
+                    return
+
+                total_size = int(response.headers.get('content-length', 0))
+                downloaded_size = 0
+                local_file_path = os.path.join(os.getcwd(), self.repo_name + '.zip')
+
+                with open(local_file_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=1024):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded_size += len(chunk)
+                            # Emit progress signal if you have a connected GUI progress bar
+                            if total_size > 0:
+                                progress_percent = int((downloaded_size / total_size) * 100)
+                                self.progress.emit(progress_percent)
+
+                # Verify the file size after download
+                if downloaded_size != total_size:
+                    self.finished.emit(False, "File download failed: Incomplete file.")
+                    return
+
+                # Unzip if necessary
+                if zipfile.is_zipfile(local_file_path):
+                    try:
+                        with zipfile.ZipFile(local_file_path, 'r') as zip_ref:
+                            zip_ref.extractall(self.repo_name)
+                        os.remove(local_file_path)
+                    except zipfile.BadZipFile:
+                        self.finished.emit(False, "File download failed: Corrupt ZIP file.")
+                        return
+
+                # If file download succeeds, emit success
+                self.finished.emit(True, f"Successfully downloaded {self.repo_name}.")
+
         except Exception as e:
             self.finished.emit(False, f"An unexpected error occurred: {str(e)}")
 
-    def download_file(self):
-        """Download a file and extract it if necessary."""
-        try:
-            response = requests.get(self.clone_url, stream=True)
-            if response.status_code != 200:
-                self.finished.emit(False, f"File download failed: HTTP status {response.status_code}.")
-                return
-
-            total_size = int(response.headers.get('content-length', 0))
-            downloaded_size = 0
-            local_file_path = f"{self.repo_name}.zip"
-
-            with open(local_file_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:
-                        f.write(chunk)
-                        downloaded_size += len(chunk)
-                        # Emit progress signal
-                        if total_size > 0:
-                            progress_percent = int((downloaded_size / total_size) * 100)
-                            self.progress.emit(progress_percent)
-
-            if downloaded_size != total_size:
-                self.finished.emit(False, "File download failed: Incomplete file.")
-                return
-
-            self.extract_zip(local_file_path)
-        except Exception as e:
-            self.finished.emit(False, f"Download error: {str(e)}")
-
-    def extract_zip(self, file_path):
-        """Extract the ZIP file."""
-        try:
-            if zipfile.is_zipfile(file_path):
-                with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                    zip_ref.extractall(self.repo_name)
-                os.remove(file_path)
-                self.finished.emit(True, f"Successfully downloaded and extracted {self.repo_name}.")
-            else:
-                self.finished.emit(True, f"Successfully downloaded {self.repo_name}. (Not a ZIP file)")
-        except zipfile.BadZipFile:
-            self.finished.emit(False, "File extraction failed: Corrupt ZIP file.")
-        except Exception as e:
-            self.finished.emit(False, f"Unexpected error during extraction: {str(e)}")
-
-    def capture_stdout(self):
-        """Capture real-time stdout from Git."""
-        output = self.process.readAllStandardOutput().data().decode('utf-8').strip()
-        print(output)
-
-    def capture_stderr(self):
-        """Capture real-time stderr from Git."""
-        error = self.process.readAllStandardError().data().decode('utf-8').strip()
-        print(error)
-
-    def git_finished(self):
-        """Handle completion of the Git cloning process."""
-        if self.process.exitCode() == 0:
-            self.finished.emit(True, f"Successfully cloned repository: {self.repo_name}.")
-        else:
-            error_message = self.process.readAllStandardError().data().decode('utf-8').strip()
-            self.finished.emit(False, f"Git clone failed: {error_message}")
+    def read_git_output(self):
+        """Capture real-time output from the Git process."""
+        output = bytes(self.process.readAllStandardOutput()).decode('utf-8')
+        print(output)  # Optionally, update your GUI log or console with this output
 
     def git_finished(self):
         """Callback for handling the QProcess finish signal for Git operations."""
@@ -1083,119 +1061,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             self.branch_var.clear()
             self.branch_var.setVisible(False)
             QMessageBox.information(self, "Info", f"No branches available for {selected_modpack}.")
-
-############################################################
-# Multi Mode
-############################################################
-
-    def open_multi_modpack_popup(self):
-        # Create a new popup window
-        popup = QDialog(self)
-        popup.setWindowTitle("Multi Modpack Download/Update")
-
-        # Create a layout for the popup
-        layout = QVBoxLayout(popup)
-
-        # Instruction label
-        label = QLabel("Select modpacks to download or update:", popup)
-        layout.addWidget(label)
-
-        # List of modpacks with checkboxes
-        self.modpack_checkboxes = []
-        modpack_names = self.get_modpack_names()
-        for modpack_name in modpack_names:
-            checkbox = QCheckBox(modpack_name, popup)
-            self.modpack_checkboxes.append(checkbox)
-            layout.addWidget(checkbox)
-
-        # Add buttons for operations
-        button_layout = QHBoxLayout()
-        download_button = QPushButton("Download", popup)
-        update_button = QPushButton("Update", popup)
-        cancel_button = QPushButton("Cancel", popup)
-        button_layout.addWidget(download_button)
-        button_layout.addWidget(update_button)
-        button_layout.addWidget(cancel_button)
-        layout.addLayout(button_layout)
-
-        # Connect buttons to their respective functions
-        download_button.clicked.connect(lambda: self.start_multi_modpack_operation(popup, operation='download'))
-        update_button.clicked.connect(lambda: self.start_multi_modpack_operation(popup, operation='update'))
-        cancel_button.clicked.connect(popup.close)
-
-        # Show the popup
-        popup.exec()
-
-
-    def start_multi_modpack_operation(self, popup, operation):
-        # Get the list of selected modpacks
-        selected_modpacks = [checkbox.text() for checkbox in self.modpack_checkboxes if checkbox.isChecked()]
-
-        if not selected_modpacks:
-            QMessageBox.warning(self, "No Modpacks Selected", "Please select at least one modpack.")
-            return
-
-        if operation not in ['download', 'update']:
-            QMessageBox.warning(self, "Invalid Operation", "Invalid operation selected.")
-            return
-
-        # Identify existing modpacks
-        existing_modpacks = self.get_existing_modpacks(selected_modpacks)
-
-        # If there are existing modpacks and operation is 'download', warn the user
-        if operation == 'download' and existing_modpacks:
-            modpacks_str = "\n".join(existing_modpacks)
-            reply = QMessageBox.question(
-                self,
-                "Confirm Re-download",
-                f"The following modpacks are already downloaded and will be re-downloaded:\n\n{modpacks_str}\n\nDo you want to proceed?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.No:
-                # User chose not to proceed
-                return
-
-        # Close the popup
-        popup.close()
-
-        # Show a progress dialog
-        operation_capitalized = operation.capitalize()
-        self.progress_dialog = QProgressDialog(f"{operation_capitalized}ing Modpacks...", "Cancel", 0, len(selected_modpacks), self)
-        self.progress_dialog.setWindowTitle("Progress")
-        self.progress_dialog.setWindowModality(Qt.WindowModality.WindowModal)
-        self.progress_dialog.setMinimumDuration(0)
-        self.progress_dialog.setValue(0)
-
-        # Start the operation in a separate thread
-        self.multi_modpack_worker = MultiModpackWorker(selected_modpacks, operation, self)
-        self.multi_modpack_worker.progress.connect(self.progress_dialog.setValue)
-        self.multi_modpack_worker.status_message.connect(self.progress_dialog.setLabelText)
-        self.multi_modpack_worker.finished.connect(self.on_multi_modpack_operation_finished)
-        self.multi_modpack_worker.start()
-
-        # If the user cancels, stop the worker
-        self.progress_dialog.canceled.connect(self.multi_modpack_worker.requestInterruption)
-
-    def on_multi_modpack_operation_finished(self):
-        self.progress_dialog.close()
-        QMessageBox.information(self, "Operation Complete", "Selected modpacks have been processed.")
-
-    def get_existing_modpacks(self, selected_modpacks):
-        existing_modpacks = []
-        for modpack_name in selected_modpacks:
-            modpack_info = self.get_modpack_info(modpack_name)
-            if modpack_info:
-                clone_url = modpack_info['url']
-                if clone_url.endswith('.git'):
-                    repo_name = clone_url.split('/')[-1].replace('.git', '')
-                else:
-                    repo_name = modpack_name.replace(' ', '_')
-                repo_path = os.path.join(os.getcwd(), repo_name)
-                if os.path.isdir(repo_path):
-                    existing_modpacks.append(modpack_name)
-        return existing_modpacks
-
 
 ############################################################
 # Foundation of tutorial
@@ -2269,7 +2134,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
     def download_modpack(self, main_window=None, clone_url=None):
         """Download the selected modpack with a prompt for overwriting."""
         modpack_name = self.modpack_var.currentText()
-        selected_branch = self.branch_var.currentText() if self.branch_var.isVisible() else "main"
+        selected_branch = self.branch_var.currentText()
         repo_url = clone_url or self.get_modpack_url(modpack_name)
 
         if not repo_url:
@@ -2293,7 +2158,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             # If Yes, delete the existing folder
             try:
-                shutil.rmtree(repo_path)
+                shutil.rmtree(repo_path, onerror=readonly_handler)  # Remove the folder and its contents
                 print(f"Deleted existing folder: {repo_path}")
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to delete existing folder: {str(e)}")
@@ -2302,15 +2167,54 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Ensure the Modpacks folder exists
         os.makedirs(os.path.dirname(repo_path), exist_ok=True)
 
-        # Start the download process
-        self.progress_dialog = QProgressDialog(f"Downloading {modpack_name} ({selected_branch})...", None, 0, 0, self)
-        self.progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+        # Create and display the progress dialog for updating
+        self.progress_dialog = QProgressDialog("", None, 0, 0)  # Pass None to remove the cancel button
+        self.progress_dialog.setWindowFlags(Qt.WindowType.FramelessWindowHint)  # No title bar
+        self.progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)  # Modal
         self.progress_dialog.setAutoClose(True)
+        self.progress_dialog.setAutoReset(True)
+        self.progress_dialog.setStyleSheet("""
+            QProgressDialog {
+                border: 3px solid #555;
+                background-color: #ffffff;
+            }
+            QLabel {
+                font-size: 24px;
+                font-weight: bold;
+                color: #333;
+                background-color: transparent;
+            }
+        """)
+
+        # Create a custom QLabel for the message with the modpack name
+        label = QLabel(f"Downloading {modpack_name}({selected_branch})...")  # Show the name of the modpack
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center-align the text
+        label.setStyleSheet("""
+            QLabel {
+                background-color: transparent;
+            }
+        """)
+
+        # Create a layout for the dialog and add the label
+        layout = QVBoxLayout(self.progress_dialog)
+        layout.addWidget(label)
+
+        self.progress_dialog.setLayout(layout)
         self.progress_dialog.show()
 
-        self.worker = ModpackDownloadWorker(repo_url, folder_name, force_update=True)
-        self.worker.progress.connect(self.update_progress_dialog)
+        # Center the progress dialog relative to the parent window
+        if isinstance(self, QWidget):
+            parent_geometry = self.geometry()
+            dialog_geometry = self.progress_dialog.frameGeometry()
+            dialog_geometry.moveCenter(parent_geometry.center())
+            self.progress_dialog.move(dialog_geometry.topLeft())
+
+        QApplication.processEvents()
+
+        self.worker = ModpackDownloadWorker(repo_url, folder_name, selected_branch, force_update=True)
         self.worker.finished.connect(self.on_download_finished)
+
+        # Start the worker thread
         self.worker.start()
 
     def on_download_finished(self, success, message):
@@ -2331,55 +2235,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Check the setting and install modpack if needed
         if success and self.settings.get("auto_install_after_download", False):
             self.install_modpack()
-
-    def show_progress_dialog(self, main_window, modpack_name):
-        """Show the progress dialog with modpack name."""
-        self.progress_dialog = QProgressDialog("", None, 0, 0)  # Pass None to remove the cancel button
-        self.progress_dialog.setWindowFlags(Qt.WindowType.FramelessWindowHint)  # No title bar
-        self.progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)  # Modal
-        self.progress_dialog.setAutoClose(True)
-        self.progress_dialog.setAutoReset(True)
-
-        # Apply custom QSS (Qt Style Sheets) for border and text styling
-        self.progress_dialog.setStyleSheet("""
-            QProgressDialog {
-                border: 3px solid #555;  /* Add a border */
-                background-color: #ffffff;  /* Background color */
-            }
-            QLabel {
-                font-size: 24px;  /* Larger text */
-                font-weight: bold;  /* Bold text */
-                color: #333;  /* Text color */
-                background-color: transparent;
-            }
-        """)
-
-        # Create a custom QLabel for the message with the modpack name
-        label = QLabel(f"Downloading {modpack_name}...")  # Show the name of the modpack
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center-align the text
-        label.setStyleSheet("""
-            QLabel {
-                background-color: transparent;
-            }
-        """)
-
-        # Create a layout for the dialog and add the label
-        layout = QVBoxLayout(self.progress_dialog)
-        layout.addWidget(label)
-
-        self.progress_dialog.setLayout(layout)
-
-        # Show the progress dialog immediately (no delay)
-        self.progress_dialog.show()
-
-        # Center the progress dialog relative to the main window
-        if isinstance(main_window, QWidget):  # Ensure main_window is a valid QWidget
-            parent_geometry = main_window.geometry()  # Get the main window's geometry
-            dialog_geometry = self.progress_dialog.frameGeometry()  # Get the dialog's geometry
-            dialog_geometry.moveCenter(parent_geometry.center())  # Center the progress dialog to the main window
-            self.progress_dialog.move(dialog_geometry.topLeft())  # Move to the new position
-
-        QApplication.processEvents()  # Ensure the UI is responsive
 
     def get_latest_tag_message(self):
         """Fetch the latest tag message from the Coonie's Modpack GitHub repository."""
