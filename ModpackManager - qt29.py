@@ -1152,7 +1152,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             default_game_dir = os.path.abspath(os.path.expandvars(self.settings["game_directory"]))
 
         # List all .exe files in the game directory and strip ".exe"
-        exe_files = self.get_exe_files(default_game_dir, macos=True)
+        exe_files = self.get_exe_files(default_game_dir)
 
         # Create a layout for the popup window
         layout = QGridLayout(popup)
