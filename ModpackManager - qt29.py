@@ -1307,14 +1307,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         print(f"Expanded Path: {expanded_path}")
         try:
             # Check if the directory exists, if not create it
-            if not os.path.exists(path):
-                os.makedirs(path)  # Create the directory and all intermediate directories if needed
+            if not os.path.exists(expanded_path):
+                os.makedirs(expanded_path)  # Create the directory and all intermediate directories if needed
                 
                 # Show information message
                 msg_box = QMessageBox()
                 msg_box.setIcon(QMessageBox.Icon.Information)
                 msg_box.setWindowTitle("Info")
-                msg_box.setText(f"Directory did not exist, created: {path}")
+                msg_box.setText(f"Directory did not exist, created: {expanded_path}")
                 msg_box.exec()
 
             # Platform-specific commands to open the directory
