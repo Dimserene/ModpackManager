@@ -2194,7 +2194,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             self.install_modpack()
 
 
-    def install_modpack(self, macos=False):
+    def install_modpack(self):
+        """Install the selected modpack with platform auto-detection for paths."""
         self.settings = self.load_settings()
         skip_mod_selection = self.settings.get("skip_mod_selection", False)
         modpack_name = self.modpack_var.currentText()
@@ -2205,15 +2206,20 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             QMessageBox.critical(self, "Error", "Modpack information not found.")
             return
 
+        # Detect the operating system
+        system_platform = platform.system()
+
         # Handle repository name and path
         repo_name = f"{modpack_name}-{selected_branch}" if selected_branch != "main" else modpack_name
         repo_path = os.path.join(os.getcwd(), "Modpacks", repo_name)
         mods_src = os.path.join(repo_path, "Mods")
-        install_path = (
-            os.path.abspath(os.path.expanduser(self.mods_dir))
-            if not macos
-            else os.path.abspath(os.path.expanduser("~/Library/Application Support/Balatro/Mods"))
-        )
+
+        # Determine the install path based on the platform
+        if system_platform == "Darwin":  # macOS
+            install_path = os.path.abspath(os.path.expanduser(self.mods_dir))
+        else:
+            install_path = os.path.abspath(os.path.expandvars(self.mods_dir))
+
         mod_list = self.get_mod_list(mods_src)
 
         # Handle special cases based on URL type
@@ -2225,20 +2231,20 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         try:
             # Check if the repository directory exists
             if not os.path.isdir(repo_path):
-                msg_box = QMessageBox()
-                msg_box.setIcon(QMessageBox.Icon.Critical)
-                msg_box.setWindowTitle("Error")
-                msg_box.setText(f"Modpack {repo_path} does not exist. Please download first.")
-                msg_box.exec()
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Modpack {repo_path} does not exist. Please download first.",
+                )
                 return
 
             # Check if the Mods folder exists in the repository
             if not os.path.isdir(mods_src):
-                msg_box = QMessageBox()
-                msg_box.setIcon(QMessageBox.Icon.Critical)
-                msg_box.setWindowTitle("Error")
-                msg_box.setText(f"Mods folder not found in the repository: {mods_src}. Please force download and try again.")
-                msg_box.exec()
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Mods folder not found in the repository: {mods_src}. Please force download and try again.",
+                )
                 return
 
             # Check if the install path exists and create it if necessary
@@ -2254,21 +2260,21 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 self.popup_mod_selection(mod_list, dependencies)
 
         except Exception as e:
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText(f"An unexpected error occurred during installation: {str(e)}")
-            msg_box.exec()
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"An unexpected error occurred during installation: {str(e)}",
+            )
 
     def get_mod_list(self, mods_src):
         try:
             return sorted([f for f in os.listdir(mods_src) if os.path.isdir(os.path.join(mods_src, f))], key=lambda s: s.lower())
         except FileNotFoundError:
-            msg_box = QMessageBox()
-            msg_box.setIcon(QMessageBox.Icon.Critical)
-            msg_box.setWindowTitle("Error")
-            msg_box.setText("Mods folder not found.")
-            msg_box.exec()
+            QMessageBox.critical(
+            self,
+            "Error",
+            f"Mods folder not found.",
+            )
             return []
         
     def popup_mod_selection(self, mod_list, dependencies):
