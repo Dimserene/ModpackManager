@@ -12,13 +12,14 @@ import pandas as pd
 # Detect OS and set default settings
 ############################################################
 
-DATE = "2025/01/18"
+DATE = "2025/01/19"
 ITERATION = "29"
-VERSION = Version("1.8.0")  # Current version of the Modpack Manager
+VERSION = Version("1.8.1")  # Current version of the Modpack Manager
 
 system_platform = platform.system()
 
 if system_platform == "Windows":
+    SETTINGS_FOLDER = os.path.abspath(os.path.expandvars(r"%AppData%\\Balatro\\ManagerSettings"))
     DEFAULT_SETTINGS = {
         "game_directory": "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Balatro",
         "profile_name": "Balatro",
@@ -30,7 +31,9 @@ if system_platform == "Windows":
         "skip_mod_selection": False,
         "auto_install": False,
     }
+
 elif system_platform == "Linux":
+    SETTINGS_FOLDER = os.path.abspath(os.path.expandvars("/home/$USER/.steam/steam/steamapps/compatdata/2379780/pfx/drive_c/users/steamuser/AppData/Roaming/Balatro/ManagerSettings"))
     DEFAULT_SETTINGS = {
         "game_directory": "/home/$USER/.steam/steam/steamapps/common/Balatro",
         "profile_name": "Balatro",
@@ -42,7 +45,9 @@ elif system_platform == "Linux":
         "skip_mod_selection": False,
         "auto_install": False,
     }
+
 elif system_platform == "Darwin":
+    SETTINGS_FOLDER = os.path.abspath(os.path.expanduser("~/Library/Application Support/Balatro/ManagerSettings"))
     DEFAULT_SETTINGS = {
         "game_directory": "~/Library/Application Support/Steam/steamapps/common/Balatro/",
         "profile_name": "Balatro",
@@ -54,15 +59,6 @@ elif system_platform == "Darwin":
         "skip_mod_selection": False,
         "auto_install": False,
     }
-
-# File paths for settings and installation exclusions
-# Determine the correct settings folder based on the operating system
-if platform.system() == "Windows":
-    SETTINGS_FOLDER = os.path.abspath(os.path.expandvars(r"%AppData%\Balatro\ManagerSettings"))
-elif platform.system() == "Darwin":  # macOS
-    SETTINGS_FOLDER = os.path.abspath(os.path.expanduser("~/Library/Application Support/Balatro/ManagerSettings"))
-else:  # Assume Linux or other Unix-like OS
-    SETTINGS_FOLDER = os.path.abspath(os.path.expanduser("~/.balatro/ManagerSettings"))
     
 SETTINGS_FILE = os.path.join(SETTINGS_FOLDER, "user_settings.json")
 INSTALL_FILE = os.path.join(SETTINGS_FOLDER, "excluded_mods.json")
@@ -629,7 +625,8 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         super(ModpackManagerApp, self).__init__(*args, **kwargs)
         self.setWindowTitle("Dimserene's Modpack Manager")
 
-        download_logo(LOGO_URL, LOGO_PATH)
+        if not os.path.exists(LOGO_PATH):
+            download_logo(LOGO_URL, LOGO_PATH)
 
         # Load the splash screen
         splash_pixmap = QPixmap(LOGO_PATH).scaled(
@@ -639,7 +636,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.splash.showMessage(
             "Loading Modpack Manager...",
             Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignCenter,
-            Qt.GlobalColor.white,
+            Qt.GlobalColor.black,
         )
         self.splash.show()
 
@@ -674,11 +671,11 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.settings = self.load_settings()
 
         if system_platform == "Darwin":  # macOS
-            self.game_dir = os.path.abspath(os.path.expanduser(self.settings.get("game_directory", "~/Library/Application Support/Balatro")))
-            self.mods_dir = os.path.abspath(os.path.expanduser(self.settings.get("mods_directory", "~/Library/Application Support/Balatro/Mods")))
-        else:
-            self.game_dir = os.path.abspath(os.path.expandvars(self.settings.get("game_directory", "%AppData%\\Balatro")))
-            self.mods_dir = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory", "%AppData%\\Balatro\\Mods")))
+            self.game_dir = os.path.abspath(os.path.expanduser(self.settings.get("game_directory")))
+            self.mods_dir = os.path.abspath(os.path.expanduser(self.settings.get("mods_directory")))
+        elif system_platform == "Windows" or "Linux":
+            self.game_dir = os.path.abspath(os.path.expandvars(self.settings.get("game_directory")))
+            self.mods_dir = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
             
         self.profile_name = self.settings.get("profile_name")
         self.selected_modpack = self.settings.get("default_modpack")
@@ -695,7 +692,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         if not self.modpack_data:
             QMessageBox.critical(self, "Error", "Failed to load modpack data. Please check your internet connection.")
             return
+
         self.splash.finish(self)
+
         self.create_widgets()
         
         self.initialize_branches()   # List all branches on startup
@@ -1146,9 +1145,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         # Adjust default game directory based on OS
         default_game_dir = self.settings["game_directory"]
-        if platform.system() == "Darwin":  # macOS
+        if system_platform == "Darwin":  # macOS
             default_game_dir = os.path.abspath(os.path.expanduser(self.settings["game_directory"]))
-        else:
+        elif system_platform == "Windows" or "Linux":
             default_game_dir = os.path.abspath(os.path.expandvars(self.settings["game_directory"]))
 
         # List all .exe files in the game directory and strip ".exe"
@@ -1307,8 +1306,14 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         Supports macOS, Windows, and Linux.
         """
         # Expand and normalize the directory path
-        expanded_path = os.path.abspath(os.path.expanduser(path))
+
+        if system_platform == "Darwin":  # macOS
+            expanded_path = os.path.abspath(os.path.expanduser(path))
+        elif system_platform == "Windows" or "Linux":
+            expanded_path = os.path.abspath(os.path.expandvars(path))
+
         print(f"Expanded Path: {expanded_path}")
+
         try:
             # Check if the directory exists, if not create it
             if not os.path.exists(expanded_path):
@@ -1322,13 +1327,13 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 msg_box.exec()
 
             # Platform-specific commands to open the directory
-            if platform.system() == "Darwin":  # macOS
+            if system_platform == "Darwin":  # macOS
                 print(f"Attempting to open directory on macOS: {expanded_path}")
                 subprocess.run(["open", expanded_path], check=True)
-            elif platform.system() == "Windows":
+            elif system_platform == "Windows":
                 print(f"Attempting to open directory on Windows: {expanded_path}")
                 os.startfile(expanded_path)  # Windows uses os.startfile
-            elif platform.system() == "Linux":
+            elif system_platform == "Linux":
                 print(f"Attempting to open directory on Linux: {expanded_path}")
                 subprocess.run(["xdg-open", expanded_path], check=True)
             else:
@@ -1340,18 +1345,16 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         """Set profile name and update mods directory and executable/app."""
         if profile_name:
             # Construct the new mods directory path based on profile name
-            system_platform = platform.system()
-
             if system_platform == "Darwin":  # macOS
                 new_mods_dir = f"~/Library/Application Support/{profile_name}/Mods"
-            else:
+            elif system_platform == "Windows" or "Linux":
                 new_mods_dir = f"%AppData%\\{profile_name}\\Mods"
 
             self.settings["mods_directory"] = new_mods_dir  # Update the settings
 
             if system_platform == "Darwin":  # macOS
                 self.mods_dir = os.path.abspath(os.path.expanduser(new_mods_dir))
-            else:
+            elif system_platform == "Windows" or "Linux":
                 self.mods_dir = os.path.abspath(os.path.expandvars(new_mods_dir))
 
 
@@ -1395,7 +1398,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             try:
                 if system_platform == "Darwin" and os.path.isdir(source_exe):
                     shutil.copytree(source_exe, destination_exe, dirs_exist_ok=True)
-                else:
+                elif system_platform == "Windows" or "Linux":
                     shutil.copy2(source_exe, destination_exe)
 
                 msg_box = QMessageBox()
@@ -1415,14 +1418,12 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
     def get_exe_files(self, directory):
         """Get a list of executables or app bundles in the directory, stripping extensions."""
         try:
-            # Detect the platform
-            system_platform = platform.system()
-            
+            # Detect the platform and fetch the corresponding files            
             if system_platform == "Darwin":  # macOS
                 # Fetch .app bundles and strip the extension
                 files = [f for f in os.listdir(directory) if f.endswith(".app") and os.path.isdir(os.path.join(directory, f))]
                 return [os.path.splitext(f)[0] for f in files]
-            else:  # Windows or other platforms
+            elif system_platform == "Windows" or "Linux":
                 # Fetch .exe files and strip the extension
                 files = [f for f in os.listdir(directory) if f.endswith(".exe")]
                 return [os.path.splitext(f)[0] for f in files]
@@ -1705,10 +1706,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         self.settings = self.load_settings()
 
-
-        # Detect the operating system
-        system_platform = platform.system()
-
+        # Check if the game directory is set
         if system_platform == "Windows":
             # Construct the path to the game executable
             game_executable = os.path.join(self.game_dir, f"{self.profile_name}.exe")
@@ -1854,21 +1852,22 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             }
         """)
 
-    def get_latest_commit_message(self, repo_owner, repo_name):
+    def get_latest_commit_message(self, owner, repo, branch="main"):
         try:
-            url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/commits"
-            response = requests.get(url)
-            response.raise_for_status()  # Raise an exception for HTTP errors
-            commits = response.json()
-            if commits:
-                latest_commit = commits[0]
-                commit_message = latest_commit['commit']['message']
-                return commit_message
-            else:
-                return "No commits found."
-        except requests.RequestException as e:
-            print(f"Request error: {e}")
-            return "Failed to fetch commits."
+            # Construct the GitHub API URL for the specific branch
+            api_url = f"https://api.github.com/repos/{owner}/{repo}/commits/{branch}"
+            
+            # Make a GET request to fetch the latest commit details
+            response = requests.get(api_url)
+            response.raise_for_status()  # Raise an HTTPError for bad responses
+
+            # Extract commit details from the response
+            commit_data = response.json()
+            commit_message = commit_data.get("commit", {}).get("message", "No commit message available")
+
+            return commit_message
+        except Exception as e:
+            return f"Error fetching commit message: {str(e)}"
 
     def fetch_commit_messages(self):
         # Dynamically fetch repositories from the "Dimserene" category in modpack_data
@@ -1879,32 +1878,38 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                     for modpack in category.get("modpacks", []):
                         name = modpack.get("name")
                         url = modpack.get("url")
+                        branches = modpack.get("branches", ["main"])  # Default to 'main' if branches are not specified
                         if name and url:
                             # Extract owner and repo name from URL
                             match = re.match(r"https://github\.com/([^/]+)/([^/.]+)", url)
                             if match:
                                 owner, repo_name = match.groups()
-                                repos[name] = (owner, repo_name)
+                                repos[name] = {"owner": owner, "repo": repo_name, "branches": branches}
 
-        # Fetch the latest commit messages for each repository
+        # Fetch the latest commit messages for each branch in each repository
         commit_messages = {}
-        for repo_name, (owner, repo) in repos.items():
-            commit_message = self.get_latest_commit_message(owner, repo)
-            # Adjust tabulation based on the length of the repo_name
-            tabs = "\t\t" if len(repo_name) < 12 else "\t"
-            commit_messages[repo_name] = f"{tabs}{commit_message}"
+        for repo_name, repo_data in repos.items():
+            owner = repo_data["owner"]
+            repo = repo_data["repo"]
+            branches = repo_data["branches"]
+            branch_messages = []
+            for branch in branches:
+                commit_message = self.get_latest_commit_message(owner, repo, branch)
+                # Adjust tabulation based on the length of the repo_name
+                tabs = "\t\t"
+                branch_messages.append(f"[{branch}]: {commit_message}")
+            
+            # Combine messages for all branches of a repository
+            commit_messages[repo_name] = f"{tabs}\n".join(branch_messages)
 
         return commit_messages
 
     def get_version_info(self):
 
-        # Resolve game and mods directories based on platform
-        system_platform = platform.system()
-
         # Paths for version and modpack name files
         if system_platform == "Darwin":  # macOS
             mods_path = os.path.join(os.path.dirname(os.path.abspath(os.path.expanduser(self.mods_dir))), "ModpackUtil")
-        else:
+        elif system_platform == "Windows" or "Linux":
             mods_path = os.path.join(os.path.dirname(os.path.abspath(os.path.expandvars(self.mods_dir))), "ModpackUtil")
 
         current_version_file = os.path.join(mods_path, 'CurrentVersion.txt')
@@ -1932,10 +1937,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.settings = self.load_settings()
 
         # Detect the operating system and resolve the install path
-        system_platform = platform.system()
         if system_platform == "Darwin":  # macOS
             install_path = os.path.abspath(os.path.expanduser(self.settings["mods_directory"]))
-        else:
+        elif system_platform == "Windows" or "Linux":
             install_path = os.path.abspath(os.path.expandvars(self.settings["mods_directory"]))
 
         # Paths for version and modpack name files
@@ -2269,9 +2273,6 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             QMessageBox.critical(self, "Error", "Modpack information not found.")
             return
 
-        # Detect the operating system
-        system_platform = platform.system()
-
         # Handle repository name and path
         repo_name = f"{modpack_name}-{selected_branch}" if selected_branch != "main" else modpack_name
         repo_path = os.path.join(os.getcwd(), "Modpacks", repo_name)
@@ -2280,7 +2281,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         # Determine the install path based on the platform
         if system_platform == "Darwin":  # macOS
             install_path = os.path.abspath(os.path.expanduser(self.mods_dir))
-        else:
+        elif system_platform == "Windows" or "Linux":
             install_path = os.path.abspath(os.path.expandvars(self.mods_dir))
 
         mod_list = self.get_mod_list(mods_src)
@@ -2823,14 +2824,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         """Check if the Mods directory exists and optionally back it up."""
         # Resolve platform-specific mods directory path
-        system_platform = platform.system()
         if system_platform == "Darwin":  # macOS
             mods_dir = os.path.abspath(os.path.expanduser(self.mods_dir))
-        elif system_platform == "Windows":  # Windows
+        elif system_platform == "Windows" or "Linux":
             mods_dir = os.path.abspath(os.path.expandvars(self.mods_dir))
-        else:
-            QMessageBox.critical(self, "Error", f"Unsupported platform: {system_platform}")
-            return
 
         # Check if the Mods directory exists
         if os.path.isdir(mods_dir):
@@ -2864,14 +2861,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
             if remove_mods:
                 # Platform-specific path resolution
-                system_platform = platform.system()
                 if system_platform == "Darwin":  # macOS
                     mods_dir = os.path.abspath(os.path.expanduser(self.mods_dir))
-                elif system_platform == "Windows":  # Windows
+                elif system_platform == "Windows" or "Linux":
                     mods_dir = os.path.abspath(os.path.expandvars(self.mods_dir))
-                else:
-                    QMessageBox.critical(self, "Error", f"Unsupported platform: {system_platform}")
-                    return
 
                 # Warning message box
                 msg_box = QMessageBox()
@@ -2908,14 +2901,10 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         try:
             # Resolve mods directory based on platform
-            system_platform = platform.system()
             if system_platform == "Darwin":  # macOS
                 mods_dir = os.path.abspath(os.path.expanduser(self.mods_dir))
-            elif system_platform == "Windows":  # Windows
+            elif system_platform == "Windows" or "Linux":
                 mods_dir = os.path.abspath(os.path.expandvars(self.mods_dir))
-            else:
-                QMessageBox.critical(self, "Error", f"Unsupported platform: {system_platform}")
-                return
 
             # Iterate through mods and copy them
             total_mods = len(filtered_mods)
@@ -2954,10 +2943,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
         finally:
             # Ensure mods_path is updated and debug folders are removed
-            system_platform = platform.system()
             if system_platform == "Darwin":  # macOS
                 mods_path = os.path.abspath(os.path.expanduser(self.settings.get("mods_directory")))
-            else:
+            elif system_platform == "Windows" or "Linux":
                 mods_path = os.path.abspath(os.path.expandvars(self.settings.get("mods_directory")))
 
             remove_debug_folders(mods_path)
@@ -2976,7 +2964,7 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
         self.settings = self.load_settings()
         if system_platform == "Darwin":  # macOS
             install_path = os.path.abspath(os.path.expanduser(self.mods_dir))
-        else:
+        elif system_platform == "Windows" or "Linux":
             install_path = os.path.abspath(os.path.expandvars(self.mods_dir))
 
         # Confirm the uninstallation
@@ -3091,27 +3079,43 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def check_versions(self):
         try:
-            # Fetch commit messages
+            # Fetch commit messages for repositories
             commit_messages = self.fetch_commit_messages()
+            
+            # Fetch version information for Coonie's modpack
             coonies_version_info = self.get_latest_coonies_tag()
-
-            # Prepare version information
-            version_info = ""
+            
+            # Prepare version information using HTML for better formatting
+            version_info = """
+            <h3>Modpack Versions:</h3>
+            <ul>
+            """
             for repo_name, commit_message in commit_messages.items():
-                version_info += f"{repo_name}:\t{commit_message}\n"
+                # Replace newlines in commit_message with <br> for HTML formatting
+                commit_message_html = commit_message.replace("\n", "<br>")
+                version_info += f"<li><b>{repo_name}</b>:<br>{commit_message_html}</li>"
+            
+            version_info += f"""
+            </ul>
+            <h3>Coonie's Modpack Version:</h3>
+            <p><b>Release:</b> {coonies_version_info}</p>
+            """
 
-            # Display version and update information
+            # Display the version and update information
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Information)
             msg_box.setWindowTitle("Version Information")
-            msg_box.setText(f"{version_info}\nCoonie's:\t{coonies_version_info}")
+            msg_box.setTextFormat(Qt.TextFormat.RichText)  # Enable rich text for HTML
+            msg_box.setText(version_info)
             msg_box.exec()
 
         except Exception as e:
+            # Handle errors and display them in a critical message box
+            error_msg = f"An error occurred while checking versions:\n{str(e)}"
             msg_box = QMessageBox()
             msg_box.setIcon(QMessageBox.Icon.Critical)
             msg_box.setWindowTitle("Error")
-            msg_box.setText(f"An error occurred while checking versions: {str(e)}")
+            msg_box.setText(error_msg)
             msg_box.exec()
 
     def read_file_content(self, file_path):
@@ -3165,10 +3169,9 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
             return
 
         # Determine platform and download URL
-        system = platform.system()
         arch = platform.machine()
 
-        if system == "Darwin":  # macOS
+        if system_platform == "Darwin":  # macOS
             if arch == "arm64":
                 url = "https://github.com/ethangreen-dev/lovely-injector/releases/latest/download/lovely-aarch64-apple-darwin.tar.gz"
             elif arch == "x86_64":
@@ -3178,17 +3181,25 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
                 return
             archive_name = "lovely-injector.tar.gz"
             extracted_files = ["liblovely.dylib", "run_lovely.sh"]
-        else:
+        elif system_platform == "Windows" or "Linux":
             url = "https://github.com/ethangreen-dev/lovely-injector/releases/latest/download/lovely-x86_64-pc-windows-msvc.zip"
             archive_name = "lovely-injector.zip"
             extracted_files = ["version.dll"]
 
         # Expand and normalize the game directory path
-        game_dir = os.path.abspath(os.path.expanduser(self.game_dir))
+        if system_platform == "Darwin":  # macOS
+            game_dir = os.path.abspath(os.path.expanduser(self.game_dir))
+            game_exe = "Balatro.app"
+        elif system_platform == "Linux":
+            game_dir = os.path.abspath(os.path.expandvars(self.game_dir))
+            game_exe = "Balatro.exe"
+        elif system_platform == "Windows":
+            game_dir = os.path.abspath(os.path.expandvars(self.game_dir))
+            game_exe = "balatro.exe"
+            
         archive_path = os.path.join(game_dir, archive_name)
 
         # Verify existence of the game executable
-        game_exe = "Balatro.app" if system == "Darwin" else "balatro.exe"
         game_path = os.path.join(game_dir, game_exe)
         if not os.path.exists(game_path):
             warning_box = QMessageBox()
@@ -3240,15 +3251,12 @@ class ModpackManagerApp(QWidget):  # or QMainWindow
 
     def check_lovely_injector_installed(self):
         """Check if Lovely Injector is installed and prompt the user to install if not."""
-        system = platform.system()
 
         # Expand and normalize the game directory path
-
-
-        if system == "Darwin":  # macOS
+        if system_platform == "Darwin":  # macOS
             game_dir = os.path.abspath(os.path.expanduser(self.game_dir))
             lovely_path = os.path.join(game_dir, "liblovely.dylib")
-        else:
+        elif system_platform == "Windows" or "Linux":
             game_dir = os.path.abspath(os.path.expandvars(self.game_dir))
             lovely_path = os.path.join(game_dir, "version.dll")
 
